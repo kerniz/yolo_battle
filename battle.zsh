@@ -397,6 +397,76 @@ DONE_LOGIC
     sleep 1
   fi
 
+  # ── help panel script (for split layouts) ──
+  local help_script="$tmpdir/help_panel.sh"
+  {
+    echo '#!/bin/zsh'
+    echo 'rst=$'"'"'\033[0m'"'"
+    echo 'bld=$'"'"'\033[1m'"'"
+    echo 'dm=$'"'"'\033[2m'"'"
+    echo 'ylw=$'"'"'\033[38;5;220m'"'"
+    echo 'grn=$'"'"'\033[38;5;82m'"'"
+    echo 'cyn=$'"'"'\033[38;5;51m'"'"
+    echo 'prp=$'"'"'\033[38;5;141m'"'"
+    echo ""
+    echo 'clear'
+    echo 'printf "\n"'
+    echo 'printf "  ${prp}${bld}╔════════════════════════════════╗${rst}\n"'
+    echo 'printf "  ${prp}${bld}║${rst}  ${cyn}명령어${rst}                       ${prp}${bld}║${rst}\n"'
+    echo 'printf "  ${prp}${bld}╠════════════════════════════════╣${rst}\n"'
+    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/status${rst}   각 AI 상태 확인   ${prp}${bld}║${rst}\n"'
+    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/diff${rst}     변경사항 확인     ${prp}${bld}║${rst}\n"'
+    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/save${rst}     결과 저장         ${prp}${bld}║${rst}\n"'
+    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/prompt X${rst} 프롬프트 변경     ${prp}${bld}║${rst}\n"'
+    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/focus N${rst}  N번 pane 포커스   ${prp}${bld}║${rst}\n"'
+
+    if [[ "$mode" == "sequential" ]]; then
+      echo 'printf "  ${prp}${bld}║${rst}  ${ylw}${bld}/next${rst}     다음 AI 시작 ${cyn}★${rst}  ${prp}${bld}║${rst}\n"'
+      echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/skip${rst}     현재 AI 건너뛰기${prp}${bld}║${rst}\n"'
+      echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/order N${rst}  순서 변경       ${prp}${bld}║${rst}\n"'
+    fi
+
+    if [[ "$mode" == "collaborative" ]]; then
+      echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/swap N M${rst} 역할 교체       ${prp}${bld}║${rst}\n"'
+      echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/role N X${rst} 역할 변경       ${prp}${bld}║${rst}\n"'
+      echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/roles${rst}    역할 확인        ${prp}${bld}║${rst}\n"'
+    fi
+
+    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/mode X${rst}   모드 변경 ${dm}(p/s/c)${rst}${prp}${bld}║${rst}\n"'
+    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/help${rst}     도움말            ${prp}${bld}║${rst}\n"'
+    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/quit${rst}     세션 종료         ${prp}${bld}║${rst}\n"'
+    echo 'printf "  ${prp}${bld}╠════════════════════════════════╣${rst}\n"'
+    echo 'printf "  ${prp}${bld}║${rst}  ${cyn}단축키${rst}                       ${prp}${bld}║${rst}\n"'
+    echo 'printf "  ${prp}${bld}╠════════════════════════════════╣${rst}\n"'
+    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}Ctrl+B → 방향키${rst} pane 이동   ${prp}${bld}║${rst}\n"'
+    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}Ctrl+B → z${rst}     풀스크린     ${prp}${bld}║${rst}\n"'
+    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}Ctrl+B → S${rst}     동기화       ${prp}${bld}║${rst}\n"'
+    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}Ctrl+B → d${rst}     세션 나가기   ${prp}${bld}║${rst}\n"'
+    echo 'printf "  ${prp}${bld}╚════════════════════════════════╝${rst}\n"'
+
+    # collaborative mode: show roles
+    if [[ "$mode" == "collaborative" ]]; then
+      echo 'printf "\n  ${grn}${bld}📋 역할 배정:${rst}\n"'
+      for ((j=1; j<=$cnt; j++)); do
+        echo "printf '   ${_yolo_icons[$j]} ${_yolo_opts[$j]}: ${_roles[$j]:-}\n'"
+      done
+    fi
+
+    # sequential mode: show order
+    if [[ "$mode" == "sequential" ]]; then
+      echo 'printf "\n  ${cyn}${bld}📋 실행 순서:${rst}\n"'
+      for ((j=1; j<=${#_seq_order[@]}; j++)); do
+        local oi=${_seq_order[$j]}
+        echo "printf '   ${j}) ${_yolo_icons[$oi]} ${_yolo_opts[$oi]}\n'"
+      done
+    fi
+
+    echo ''
+    echo '# keep alive'
+    echo 'while true; do sleep 3600; done'
+  } > "$help_script"
+  chmod +x "$help_script"
+
   # ── command center script ──
   local cmd_script="$tmpdir/cmd_center.sh"
   {
@@ -407,6 +477,7 @@ DONE_LOGIC
     echo "mode=\"$mode\""
     echo "savedir=\"$savedir\""
     echo "workdir=\"$workdir\""
+    echo "has_help_pane=false"
 
     # embed tool names for display
     echo "_cmd_tools=("
@@ -444,76 +515,89 @@ while [ ! -f "$tmpdir/ai_panes.txt" ]; do sleep 0.1; done
 ai_panes=( $(cat "$tmpdir/ai_panes.txt") )
 
 clear
-printf "\n"
-printf "  ${prp}${bld}╔══════════════════════════════════════╗${rst}\n"
-printf "  ${prp}${bld}║${rst}  ${ylw}${bld}⌨️  C O M M A N D   C E N T E R${rst}    ${prp}${bld}║${rst}\n"
-printf "  ${prp}${bld}╠══════════════════════════════════════╣${rst}\n"
 
-case "$mode" in
-  parallel)
-    printf "  ${prp}${bld}║${rst}  ${ylw}${bld}⚡ PARALLEL${rst} ${dm}동시 모드${rst}             ${prp}${bld}║${rst}\n"
-    printf "  ${prp}${bld}║${rst}  ${dm}입력 → 모든 AI에 동시 전송${rst}         ${prp}${bld}║${rst}\n"
-    ;;
-  sequential)
-    printf "  ${prp}${bld}║${rst}  ${cyn}${bld}➡️  SEQUENTIAL${rst} ${dm}순차 모드${rst}          ${prp}${bld}║${rst}\n"
-    printf "  ${prp}${bld}║${rst}  ${dm}한 AI씩 순서대로 실행${rst}              ${prp}${bld}║${rst}\n"
-    ;;
-  collaborative)
-    printf "  ${prp}${bld}║${rst}  ${grn}${bld}🤝 COLLABORATIVE${rst} ${dm}협동 모드${rst}        ${prp}${bld}║${rst}\n"
-    printf "  ${prp}${bld}║${rst}  ${dm}역할별 동시 작업${rst}                   ${prp}${bld}║${rst}\n"
-    ;;
-esac
+if [[ "$has_help_pane" == "true" ]]; then
+  # compact header when help panel is separate
+  printf "\n"
+  printf "  ${prp}${bld}⌨️  COMMAND CENTER${rst}"
+  case "$mode" in
+    parallel)      printf "  ${ylw}${bld}⚡${rst} ${dm}동시${rst}" ;;
+    sequential)    printf "  ${cyn}${bld}➡️${rst} ${dm}순차${rst}" ;;
+    collaborative) printf "  ${grn}${bld}🤝${rst} ${dm}협동${rst}" ;;
+  esac
+  printf "\n  ${dm}텍스트 입력 → AI에 전송 │ /help 도움말${rst}\n\n"
+else
+  printf "\n"
+  printf "  ${prp}${bld}╔══════════════════════════════════════╗${rst}\n"
+  printf "  ${prp}${bld}║${rst}  ${ylw}${bld}⌨️  C O M M A N D   C E N T E R${rst}    ${prp}${bld}║${rst}\n"
+  printf "  ${prp}${bld}╠══════════════════════════════════════╣${rst}\n"
 
-printf "  ${prp}${bld}╠══════════════════════════════════════╣${rst}\n"
-printf "  ${prp}${bld}║${rst}  ${cyn}명령어:${rst}                            ${prp}${bld}║${rst}\n"
-printf "  ${prp}${bld}║${rst}   ${ylw}/status${rst}    각 AI 상태 확인        ${prp}${bld}║${rst}\n"
-printf "  ${prp}${bld}║${rst}   ${ylw}/diff${rst}      각 AI 변경사항 확인   ${prp}${bld}║${rst}\n"
-printf "  ${prp}${bld}║${rst}   ${ylw}/save${rst}      결과 저장              ${prp}${bld}║${rst}\n"
-printf "  ${prp}${bld}║${rst}   ${ylw}/prompt X${rst}  프롬프트 변경          ${prp}${bld}║${rst}\n"
-printf "  ${prp}${bld}║${rst}   ${ylw}/focus N${rst}   N번 pane 포커스        ${prp}${bld}║${rst}\n"
+  case "$mode" in
+    parallel)
+      printf "  ${prp}${bld}║${rst}  ${ylw}${bld}⚡ PARALLEL${rst} ${dm}동시 모드${rst}             ${prp}${bld}║${rst}\n"
+      printf "  ${prp}${bld}║${rst}  ${dm}입력 → 모든 AI에 동시 전송${rst}         ${prp}${bld}║${rst}\n"
+      ;;
+    sequential)
+      printf "  ${prp}${bld}║${rst}  ${cyn}${bld}➡️  SEQUENTIAL${rst} ${dm}순차 모드${rst}          ${prp}${bld}║${rst}\n"
+      printf "  ${prp}${bld}║${rst}  ${dm}한 AI씩 순서대로 실행${rst}              ${prp}${bld}║${rst}\n"
+      ;;
+    collaborative)
+      printf "  ${prp}${bld}║${rst}  ${grn}${bld}🤝 COLLABORATIVE${rst} ${dm}협동 모드${rst}        ${prp}${bld}║${rst}\n"
+      printf "  ${prp}${bld}║${rst}  ${dm}역할별 동시 작업${rst}                   ${prp}${bld}║${rst}\n"
+      ;;
+  esac
 
-if [[ "$mode" == "sequential" ]]; then
-  printf "  ${prp}${bld}║${rst}   ${ylw}${bld}/next${rst}      다음 AI 시작 ${cyn}★${rst}       ${prp}${bld}║${rst}\n"
-  printf "  ${prp}${bld}║${rst}   ${ylw}/skip${rst}      현재 AI 건너뛰기     ${prp}${bld}║${rst}\n"
-  printf "  ${prp}${bld}║${rst}   ${ylw}/order N..${rst} 순서 변경 ${dm}(예:2 1 3)${rst}${prp}${bld}║${rst}\n"
+  printf "  ${prp}${bld}╠══════════════════════════════════════╣${rst}\n"
+  printf "  ${prp}${bld}║${rst}  ${cyn}명령어:${rst}                            ${prp}${bld}║${rst}\n"
+  printf "  ${prp}${bld}║${rst}   ${ylw}/status${rst}    각 AI 상태 확인        ${prp}${bld}║${rst}\n"
+  printf "  ${prp}${bld}║${rst}   ${ylw}/diff${rst}      각 AI 변경사항 확인   ${prp}${bld}║${rst}\n"
+  printf "  ${prp}${bld}║${rst}   ${ylw}/save${rst}      결과 저장              ${prp}${bld}║${rst}\n"
+  printf "  ${prp}${bld}║${rst}   ${ylw}/prompt X${rst}  프롬프트 변경          ${prp}${bld}║${rst}\n"
+  printf "  ${prp}${bld}║${rst}   ${ylw}/focus N${rst}   N번 pane 포커스        ${prp}${bld}║${rst}\n"
+
+  if [[ "$mode" == "sequential" ]]; then
+    printf "  ${prp}${bld}║${rst}   ${ylw}${bld}/next${rst}      다음 AI 시작 ${cyn}★${rst}       ${prp}${bld}║${rst}\n"
+    printf "  ${prp}${bld}║${rst}   ${ylw}/skip${rst}      현재 AI 건너뛰기     ${prp}${bld}║${rst}\n"
+    printf "  ${prp}${bld}║${rst}   ${ylw}/order N..${rst} 순서 변경 ${dm}(예:2 1 3)${rst}${prp}${bld}║${rst}\n"
+  fi
+
+  if [[ "$mode" == "collaborative" ]]; then
+    printf "  ${prp}${bld}║${rst}   ${ylw}/swap N M${rst}  N↔M 역할 교체        ${prp}${bld}║${rst}\n"
+    printf "  ${prp}${bld}║${rst}   ${ylw}/role N X${rst}  N번 AI 역할 변경     ${prp}${bld}║${rst}\n"
+    printf "  ${prp}${bld}║${rst}   ${ylw}/roles${rst}     현재 역할 확인        ${prp}${bld}║${rst}\n"
+  fi
+
+  printf "  ${prp}${bld}║${rst}   ${ylw}/mode X${rst}    모드 변경 ${dm}(p/s/c)${rst}   ${prp}${bld}║${rst}\n"
+  printf "  ${prp}${bld}║${rst}   ${ylw}/help${rst}      도움말                ${prp}${bld}║${rst}\n"
+  printf "  ${prp}${bld}║${rst}   ${ylw}/quit${rst}      세션 종료              ${prp}${bld}║${rst}\n"
+  printf "  ${prp}${bld}╠══════════════════════════════════════╣${rst}\n"
+  printf "  ${prp}${bld}║${rst}  ${cyn}단축키:${rst}                            ${prp}${bld}║${rst}\n"
+  printf "  ${prp}${bld}║${rst}   ${ylw}Ctrl+B → 방향키${rst}  pane 이동        ${prp}${bld}║${rst}\n"
+  printf "  ${prp}${bld}║${rst}   ${ylw}Ctrl+B → z${rst}      풀스크린 토글     ${prp}${bld}║${rst}\n"
+  printf "  ${prp}${bld}║${rst}   ${ylw}Ctrl+B → S${rst}      동기화 토글       ${prp}${bld}║${rst}\n"
+  printf "  ${prp}${bld}║${rst}   ${ylw}Ctrl+B → d${rst}      세션 나가기       ${prp}${bld}║${rst}\n"
+  printf "  ${prp}${bld}╚══════════════════════════════════════╝${rst}\n"
+
+  # collaborative mode: show roles
+  if [[ "$mode" == "collaborative" ]]; then
+    printf "\n  ${grn}${bld}📋 역할 배정:${rst}\n"
+    for ((r=1; r<=${#_cmd_tools[@]}; r++)); do
+      printf "   ${_cmd_icons[$r]} ${_cmd_tools[$r]}: ${ylw}${_cmd_roles[$r]}${rst}\n"
+    done
+  fi
+
+  # sequential mode: show order (using custom order)
+  if [[ "$mode" == "sequential" ]]; then
+    printf "\n  ${cyn}${bld}📋 실행 순서:${rst}\n"
+    for ((r=1; r<=${#_cmd_seq_order[@]}; r++)); do
+      local oi=${_cmd_seq_order[$r]}
+      printf "   ${dm}#${r}${rst} ${_cmd_icons[$oi]} ${_cmd_tools[$oi]}\n"
+    done
+    printf "\n  ${ylw}${bld}▶ #1 자동 시작됨. /next로 다음 진행${rst}\n"
+  fi
+
+  printf "\n"
 fi
-
-if [[ "$mode" == "collaborative" ]]; then
-  printf "  ${prp}${bld}║${rst}   ${ylw}/swap N M${rst}  N↔M 역할 교체        ${prp}${bld}║${rst}\n"
-  printf "  ${prp}${bld}║${rst}   ${ylw}/role N X${rst}  N번 AI 역할 변경     ${prp}${bld}║${rst}\n"
-  printf "  ${prp}${bld}║${rst}   ${ylw}/roles${rst}     현재 역할 확인        ${prp}${bld}║${rst}\n"
-fi
-
-printf "  ${prp}${bld}║${rst}   ${ylw}/mode X${rst}    모드 변경 ${dm}(p/s/c)${rst}   ${prp}${bld}║${rst}\n"
-printf "  ${prp}${bld}║${rst}   ${ylw}/help${rst}      도움말                ${prp}${bld}║${rst}\n"
-printf "  ${prp}${bld}║${rst}   ${ylw}/quit${rst}      세션 종료              ${prp}${bld}║${rst}\n"
-printf "  ${prp}${bld}╠══════════════════════════════════════╣${rst}\n"
-printf "  ${prp}${bld}║${rst}  ${cyn}단축키:${rst}                            ${prp}${bld}║${rst}\n"
-printf "  ${prp}${bld}║${rst}   ${ylw}Ctrl+B → 방향키${rst}  pane 이동        ${prp}${bld}║${rst}\n"
-printf "  ${prp}${bld}║${rst}   ${ylw}Ctrl+B → z${rst}      풀스크린 토글     ${prp}${bld}║${rst}\n"
-printf "  ${prp}${bld}║${rst}   ${ylw}Ctrl+B → S${rst}      동기화 토글       ${prp}${bld}║${rst}\n"
-printf "  ${prp}${bld}║${rst}   ${ylw}Ctrl+B → d${rst}      세션 나가기       ${prp}${bld}║${rst}\n"
-printf "  ${prp}${bld}╚══════════════════════════════════════╝${rst}\n"
-
-# collaborative mode: show roles
-if [[ "$mode" == "collaborative" ]]; then
-  printf "\n  ${grn}${bld}📋 역할 배정:${rst}\n"
-  for ((r=1; r<=${#_cmd_tools[@]}; r++)); do
-    printf "   ${_cmd_icons[$r]} ${_cmd_tools[$r]}: ${ylw}${_cmd_roles[$r]}${rst}\n"
-  done
-fi
-
-# sequential mode: show order (using custom order)
-if [[ "$mode" == "sequential" ]]; then
-  printf "\n  ${cyn}${bld}📋 실행 순서:${rst}\n"
-  for ((r=1; r<=${#_cmd_seq_order[@]}; r++)); do
-    local oi=${_cmd_seq_order[$r]}
-    printf "   ${dm}#${r}${rst} ${_cmd_icons[$oi]} ${_cmd_tools[$oi]}\n"
-  done
-  printf "\n  ${ylw}${bld}▶ #1 자동 시작됨. /next로 다음 진행${rst}\n"
-fi
-
-printf "\n"
 
 _show_status() {
   printf "\n"
@@ -966,26 +1050,31 @@ CMD_BODY
   if [ $cnt -eq 2 ]; then
     # ┌──────────┬──────────┐
     # │  tool1   │  tool2   │
-    # ├──────────┴──────────┤
-    # │     ⌨️ COMMAND       │
-    # └─────────────────────┘
+    # ├──────────┼──────────┤
+    # │ ⌨️ INPUT  │ 📋 HELP  │
+    # └──────────┴──────────┘
+    sed -i '' 's/has_help_pane=false/has_help_pane=true/' "$cmd_script"
     tmux new-session -d -s "$session" "zsh ${_battle_scripts[1]}"
     _ai_pane_ids[1]=$(tmux display-message -t "${session}" -p '#{pane_id}')
     tmux split-window -v -t "${_ai_pane_ids[1]}" -p 30 "zsh ${cmd_script}"
     _cmd_pane_id=$(tmux display-message -t "${session}" -p '#{pane_id}')
     tmux split-window -h -t "${_ai_pane_ids[1]}" -p 50 "zsh ${_battle_scripts[2]}"
     _ai_pane_ids[2]=$(tmux display-message -t "${session}" -p '#{pane_id}')
+    tmux split-window -h -t "${_cmd_pane_id}" -p 45 "zsh ${help_script}"
+    local _help_pane_id=$(tmux display-message -t "${session}" -p '#{pane_id}')
     echo "${_ai_pane_ids[1]} ${_ai_pane_ids[2]}" > "$tmpdir/ai_panes.txt"
     tmux select-pane -t "${_ai_pane_ids[1]}" -T "${_yolo_icons[1]} ${(U)_yolo_opts[1]}"
     tmux select-pane -t "${_ai_pane_ids[2]}" -T "${_yolo_icons[2]} ${(U)_yolo_opts[2]}"
-    tmux select-pane -t "${_cmd_pane_id}" -T "⌨️  COMMAND CENTER"
+    tmux select-pane -t "${_cmd_pane_id}" -T "⌨️  COMMAND"
+    tmux select-pane -t "${_help_pane_id}" -T "📋 GUIDE"
   elif [ $cnt -ge 3 ]; then
     if [[ "$_layout_choice" == "top3" ]]; then
       # ┌──────┬──────┬──────┐
       # │tool1 │tool2 │tool3 │
-      # ├──────┴──────┴──────┤
-      # │    ⌨️ COMMAND       │
-      # └────────────────────┘
+      # ├──────────┬─────────┤
+      # │ ⌨️ INPUT  │ 📋 HELP │
+      # └──────────┴─────────┘
+      sed -i '' 's/has_help_pane=false/has_help_pane=true/' "$cmd_script"
       tmux new-session -d -s "$session" "zsh ${_battle_scripts[1]}"
       _ai_pane_ids[1]=$(tmux display-message -t "${session}" -p '#{pane_id}')
       tmux split-window -v -t "${_ai_pane_ids[1]}" -p 30 "zsh ${cmd_script}"
@@ -994,6 +1083,10 @@ CMD_BODY
       _ai_pane_ids[2]=$(tmux display-message -t "${session}" -p '#{pane_id}')
       tmux split-window -h -t "${_ai_pane_ids[2]}" -p 50 "zsh ${_battle_scripts[3]}"
       _ai_pane_ids[3]=$(tmux display-message -t "${session}" -p '#{pane_id}')
+      tmux split-window -h -t "${_cmd_pane_id}" -p 45 "zsh ${help_script}"
+      local _help_pane_id=$(tmux display-message -t "${session}" -p '#{pane_id}')
+      tmux select-pane -t "${_cmd_pane_id}" -T "⌨️  COMMAND"
+      tmux select-pane -t "${_help_pane_id}" -T "📋 GUIDE"
     else
       # ┌──────────┬──────────┐
       # │  tool1   │  tool2   │
@@ -1013,7 +1106,9 @@ CMD_BODY
     tmux select-pane -t "${_ai_pane_ids[1]}" -T "${_yolo_icons[1]} ${(U)_yolo_opts[1]}"
     tmux select-pane -t "${_ai_pane_ids[2]}" -T "${_yolo_icons[2]} ${(U)_yolo_opts[2]}"
     tmux select-pane -t "${_ai_pane_ids[3]}" -T "${_yolo_icons[3]} ${(U)_yolo_opts[3]}"
-    tmux select-pane -t "${_cmd_pane_id}" -T "⌨️  COMMAND CENTER"
+    if [[ "$_layout_choice" != "top3" ]]; then
+      tmux select-pane -t "${_cmd_pane_id}" -T "⌨️  COMMAND CENTER"
+    fi
   fi
 
   # collaborative mode: add role to pane titles
