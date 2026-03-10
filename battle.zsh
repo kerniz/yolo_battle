@@ -60,8 +60,8 @@ _yolo_battle() {
   if [ -n "$prompt" ]; then
     _role_prompts=(
       "You are a developer. Write production-ready code for: ${prompt}"
-      "You are a senior code reviewer. Review the implementation and suggest improvements for: ${prompt}"
-      "You are a QA engineer. Write comprehensive tests for: ${prompt}"
+      "You are a senior code reviewer. The Developer has already implemented the code (their changes are attached below). Review the implementation, identify issues, and apply improvements directly. Task: ${prompt}"
+      "You are a QA engineer. The Developer has already implemented the code (their changes are attached below). Write comprehensive tests for the implementation. Task: ${prompt}"
     )
   fi
 
@@ -170,6 +170,12 @@ B
         ;;
       esac
 
+      # collaborative mode: inject role variable early (needed by WAIT_LOGIC)
+      if [[ "$mode" == "collaborative" ]]; then
+        echo "collab_role=\"${_roles[$j]:-Developer}\""
+        echo "collab_dev_tool=\"${_yolo_opts[1]}\""
+      fi
+
       # mode-specific behavior
       cat << 'WAIT_LOGIC'
 # ── sequential mode: wait for turn ──
@@ -198,13 +204,42 @@ if [[ "$mode" == "sequential" ]]; then
     printf '  \033[2m(%d lines of diff)\033[0m\n\n' "$(wc -l < "$prev_diff_file")"
   fi
 fi
+
+# ── collaborative mode: non-Developer waits for Developer ──
+if [[ "$mode" == "collaborative" ]] && [[ "$collab_role" != "Developer" ]]; then
+  echo "waiting" > "$statusfile"
+  printf '  \033[2m⏳ Developer 완료 대기중...\033[0m\n'
+  while [ ! -f "$tmpdir/collab_dev_done.txt" ]; do
+    sleep 0.5
+  done
+  printf '  \033[38;5;220m\033[1m▶ Developer 완료! 시작합니다.\033[0m\n\n'
+
+  _dev_diff_file="$tmpdir/diff_${collab_dev_tool}.txt"
+  if [ -f "$_dev_diff_file" ] && [ -s "$_dev_diff_file" ]; then
+    printf '  \033[38;5;51m\033[1m📋 Developer 변경사항:\033[0m\n'
+    printf '  \033[2m(%d lines of diff)\033[0m\n\n' "$(wc -l < "$_dev_diff_file")"
+  fi
+fi
 WAIT_LOGIC
 
       # determine prompt based on mode
       echo 'prompt=$(cat "$tmpdir/prompt.txt")'
       echo ""
 
-      # inject previous changes into prompt for sequential mode
+      # collaborative mode: set role prompt (before context inject so context appends to role prompt)
+      if [[ "$mode" == "collaborative" ]]; then
+        local role="${_roles[$j]:-Developer}"
+        local rprompt="${_role_prompts[$j]}"
+        echo "role=\"$role\""
+        echo "printf '  \\033[38;5;220m\\033[1m📋 Role: ${role}\\033[0m\\n\\n'"
+        if [ -n "$rprompt" ]; then
+          # Write role prompt to a file to avoid quoting issues
+          printf '%s' "$rprompt" > "$tmpdir/role_prompt_${tname}.txt"
+          echo "prompt=\$(cat \"$tmpdir/role_prompt_${tname}.txt\")"
+        fi
+      fi
+
+      # inject previous changes into prompt for sequential/collaborative mode
       cat << 'CONTEXT_INJECT'
 if [[ "$mode" == "sequential" ]] && [ -n "$my_turn" ] && [ "$my_turn" -gt 1 ]; then
   prev_diff="$tmpdir/diff_turn_$((my_turn - 1)).txt"
@@ -217,19 +252,19 @@ if [[ "$mode" == "sequential" ]] && [ -n "$my_turn" ] && [ "$my_turn" -gt 1 ]; t
     prompt="${prompt}"$'\n\n'"[Context: Changes made by previous AI]"$'\n'"${ctx}"
   fi
 fi
-CONTEXT_INJECT
 
-      if [[ "$mode" == "collaborative" ]]; then
-        local role="${_roles[$j]:-Developer}"
-        local rprompt="${_role_prompts[$j]}"
-        echo "role=\"$role\""
-        echo "printf '  \\033[38;5;220m\\033[1m📋 Role: ${role}\\033[0m\\n\\n'"
-        if [ -n "$rprompt" ]; then
-          # Write role prompt to a file to avoid quoting issues
-          printf '%s' "$rprompt" > "$tmpdir/role_prompt_${tname}.txt"
-          echo "prompt=\$(cat \"$tmpdir/role_prompt_${tname}.txt\")"
-        fi
-      fi
+# collaborative mode: inject Developer's changes into Reviewer/Tester prompt
+if [[ "$mode" == "collaborative" ]] && [[ "$collab_role" != "Developer" ]]; then
+  _dev_diff_file="$tmpdir/diff_${collab_dev_tool}.txt"
+  if [ -f "$_dev_diff_file" ] && [ -s "$_dev_diff_file" ]; then
+    ctx=$(cat "$_dev_diff_file")
+    if [ $(echo "$ctx" | wc -l) -gt 300 ]; then
+      ctx="$(echo "$ctx" | head -300)"$'\n... (truncated)'
+    fi
+    prompt="${prompt}"$'\n\n'"[Developer's code changes - review/test this code]"$'\n'"${ctx}"
+  fi
+fi
+CONTEXT_INJECT
 
       # mark as running + record start time
       echo 'echo "running" > "$statusfile"'
@@ -295,6 +330,14 @@ Tool: ${toolname}" 2>/dev/null
   fi
 else
   printf '\n  \033[2m  (no changes detected)\033[0m\n'
+fi
+
+# ── collaborative mode: Developer signals completion for Phase 2 ──
+if [[ "$mode" == "collaborative" ]] && [[ "$collab_role" == "Developer" ]]; then
+  # save diff even if empty (signal file doubles as ready marker)
+  [ -n "$_diff" ] || echo "" > "$tmpdir/diff_${toolname}.txt"
+  echo "$toolname" > "$tmpdir/collab_dev_done.txt"
+  printf '\n  \033[38;5;82m\033[1m🚀 Reviewer & Tester 시작 시그널 전송!\033[0m\n'
 fi
 
 printf '\n  \033[2m[완료] 아무 키나 누르세요...\033[0m'
