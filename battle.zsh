@@ -46,6 +46,14 @@ _yolo_battle() {
   git -C "$workdir" diff HEAD --stat > "$tmpdir/git_baseline.txt" 2>/dev/null
   git -C "$workdir" rev-parse HEAD > "$tmpdir/git_head.txt" 2>/dev/null
 
+  local _is_restart=false
+  while true; do
+  # ── reset mode-dependent state for restart ──
+  printf '%s' "$mode" > "$tmpdir/mode.txt"
+  echo "0" > "$tmpdir/seq_turn.txt"
+  rm -f "$tmpdir/seq_order_map.txt" "$tmpdir/run_"*.sh "$tmpdir/cmd_center.sh" "$tmpdir/monitor.sh" "$tmpdir/ai_panes.txt"
+  rm -f "$tmpdir/status_"* "$tmpdir/diff_"*
+
   # ── role definitions for collaborative mode ──
   local -a _roles _role_prompts
   _roles=("Developer" "Reviewer" "Tester")
@@ -59,7 +67,7 @@ _yolo_battle() {
 
   # ── sequential mode: order selection ──
   _seq_order=()
-  if [[ "$mode" == "sequential" ]] && [ -t 0 ]; then
+  if [[ "$mode" == "sequential" ]] && [ -t 0 ] && ! $_is_restart; then
     printf "\n"
     printf "  ${cyan}${bold}➡️  순차 모드 - 실행 순서${reset}\n"
     printf "  ${dim}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${reset}\n"
@@ -318,28 +326,33 @@ DONE_LOGIC
   esac
 
   # ── launch banner ──
-  printf "\n"
-  printf "  ${purple}${bold}╔══════════════════════════════════════╗${reset}\n"
-  printf "  ${purple}${bold}║${reset}  ${red}${bold}⚔️  Y O L O   B A T T L E${reset}          ${purple}${bold}║${reset}\n"
-  printf "  ${purple}${bold}╠══════════════════════════════════════╣${reset}\n"
-  printf "  ${purple}${bold}║${reset}  ${mode_color}${bold}${mode_icon} ${mode_label}${reset}%-$((21 - ${#mode_label}))s${purple}${bold}║${reset}\n" ""
-  printf "  ${purple}${bold}╠══════════════════════════════════════╣${reset}\n"
-  for ((j=1; j<=$cnt; j++)); do
-    local extra=""
-    if [[ "$mode" == "collaborative" ]]; then
-      extra=" (${_roles[$j]:-Dev})"
-    elif [[ "$mode" == "sequential" ]]; then
-      extra=" [#$j]"
-    fi
-    printf "  ${purple}${bold}║${reset}   ${tcolors[$j]}${bold} ${_yolo_icons[$j]}  ${(U)_yolo_opts[$j]}${reset}${dim}${extra}${reset}%-$((26 - ${#_yolo_opts[$j]} - ${#extra}))s${purple}${bold}║${reset}\n" ""
-  done
-  if [ -n "$prompt" ]; then
+  if $_is_restart; then
+    printf "\n  ${mode_color}${bold}${mode_icon} ${mode_label}${reset} ${dim}모드로 재시작합니다...${reset}\n\n"
+    sleep 0.5
+  else
+    printf "\n"
+    printf "  ${purple}${bold}╔══════════════════════════════════════╗${reset}\n"
+    printf "  ${purple}${bold}║${reset}  ${red}${bold}⚔️  Y O L O   B A T T L E${reset}          ${purple}${bold}║${reset}\n"
     printf "  ${purple}${bold}╠══════════════════════════════════════╣${reset}\n"
-    printf "  ${purple}${bold}║${reset}  ${yellow}${bold}⚡${reset} ${white}%.34s${reset} ${purple}${bold}║${reset}\n" "$prompt"
+    printf "  ${purple}${bold}║${reset}  ${mode_color}${bold}${mode_icon} ${mode_label}${reset}%-$((21 - ${#mode_label}))s${purple}${bold}║${reset}\n" ""
+    printf "  ${purple}${bold}╠══════════════════════════════════════╣${reset}\n"
+    for ((j=1; j<=$cnt; j++)); do
+      local extra=""
+      if [[ "$mode" == "collaborative" ]]; then
+        extra=" (${_roles[$j]:-Dev})"
+      elif [[ "$mode" == "sequential" ]]; then
+        extra=" [#$j]"
+      fi
+      printf "  ${purple}${bold}║${reset}   ${tcolors[$j]}${bold} ${_yolo_icons[$j]}  ${(U)_yolo_opts[$j]}${reset}${dim}${extra}${reset}%-$((26 - ${#_yolo_opts[$j]} - ${#extra}))s${purple}${bold}║${reset}\n" ""
+    done
+    if [ -n "$prompt" ]; then
+      printf "  ${purple}${bold}╠══════════════════════════════════════╣${reset}\n"
+      printf "  ${purple}${bold}║${reset}  ${yellow}${bold}⚡${reset} ${white}%.34s${reset} ${purple}${bold}║${reset}\n" "$prompt"
+    fi
+    printf "  ${purple}${bold}╚══════════════════════════════════════╝${reset}\n"
+    printf "\n  ${dim}Launching tmux session...${reset}\n"
+    sleep 1
   fi
-  printf "  ${purple}${bold}╚══════════════════════════════════════╝${reset}\n"
-  printf "\n  ${dim}Launching tmux session...${reset}\n"
-  sleep 1
 
   # ── command center script ──
   local cmd_script="$tmpdir/cmd_center.sh"
@@ -675,58 +688,10 @@ _do_mode_switch() {
     return
   fi
 
-  local old_mode="$mode"
-  mode="$new_mode"
-  printf '%s' "$mode" > "$tmpdir/mode.txt"
-
-  # update pane titles based on new mode
-  for ((mi=1; mi<=${#_cmd_tools[@]}; mi++)); do
-    local pane_id="${ai_panes[$mi]}"
-    case "$mode" in
-      collaborative)
-        tmux select-pane -t "${pane_id}" -T "${_cmd_icons[$mi]} ${(U)_cmd_tools[$mi]} (${_cmd_roles[$mi]:-Dev})" 2>/dev/null
-        ;;
-      sequential)
-        tmux select-pane -t "${pane_id}" -T "#${mi} ${_cmd_icons[$mi]} ${(U)_cmd_tools[$mi]}" 2>/dev/null
-        ;;
-      *)
-        tmux select-pane -t "${pane_id}" -T "${_cmd_icons[$mi]} ${(U)_cmd_tools[$mi]}" 2>/dev/null
-        ;;
-    esac
-  done
-
-  # update tmux status bar mode label
-  local mode_status_label
-  case "$mode" in
-    parallel)      mode_status_label="⚡ PARALLEL" ;;
-    sequential)    mode_status_label="➡️  SEQUENTIAL" ;;
-    collaborative) mode_status_label="🤝 COLLAB" ;;
-  esac
-  tmux set-option -t "$session" status-left \
-    " #[fg=colour196,bold]⚔️  BATTLE#[default] #[fg=colour240]│#[default] #[fg=colour220]${mode_status_label}#[default]  " 2>/dev/null
-
-  # sequential mode: init turn tracking
-  if [[ "$mode" == "sequential" ]]; then
-    echo "1" > "$tmpdir/seq_turn.txt"
-    printf "\n  ${cyn}${bld}➡️  SEQUENTIAL 모드로 전환${rst}\n"
-    printf "  ${dm}순차 실행 시작. /next로 다음 AI 진행${rst}\n"
-    printf "  ${cyn}${bld}📋 실행 순서:${rst}\n"
-    for ((r=1; r<=${#_cmd_seq_order[@]}; r++)); do
-      local oi=${_cmd_seq_order[$r]}
-      printf "   ${dm}#${r}${rst} ${_cmd_icons[$oi]} ${_cmd_tools[$oi]}\n"
-    done
-    printf "  ${ylw}${bld}▶ #1 시작${rst}\n"
-  elif [[ "$mode" == "parallel" ]]; then
-    printf "\n  ${ylw}${bld}⚡ PARALLEL 모드로 전환${rst}\n"
-    printf "  ${dm}입력이 모든 AI에 동시 전송됩니다${rst}\n"
-  elif [[ "$mode" == "collaborative" ]]; then
-    printf "\n  ${grn}${bld}🤝 COLLABORATIVE 모드로 전환${rst}\n"
-    printf "  ${grn}${bld}📋 역할 배정:${rst}\n"
-    for ((r=1; r<=${#_cmd_tools[@]}; r++)); do
-      printf "   ${_cmd_icons[$r]} ${_cmd_tools[$r]}: ${ylw}${_cmd_roles[$r]:-Dev}${rst}\n"
-    done
-  fi
-  printf "\n"
+  printf "  ${ylw}${bld}⚡ ${new_mode} 모드로 전환 중... 세션을 재시작합니다${rst}\n"
+  sleep 1
+  printf '%s' "$new_mode" > "$tmpdir/new_mode.txt"
+  tmux kill-session -t "$session" 2>/dev/null
 }
 
 # sequential mode: auto-start first AI
@@ -922,7 +887,7 @@ CMD_BODY
 
   # ── layout selection for 3+ tools ──
   local _layout_choice="top3"
-  if [ $cnt -ge 3 ] && [ -t 0 ]; then
+  if [ $cnt -ge 3 ] && [ -t 0 ] && ! $_is_restart; then
     printf "\n"
     printf "  ${cyan}${bold}📐 레이아웃 선택${reset}\n"
     printf "  ${dim}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${reset}\n"
@@ -1159,5 +1124,18 @@ MONITOR_BODY
 
   # cleanup
   kill $monitor_pid 2>/dev/null
+
+  # check for mode restart request
+  if [ -f "$tmpdir/new_mode.txt" ]; then
+    mode=$(cat "$tmpdir/new_mode.txt")
+    rm -f "$tmpdir/new_mode.txt"
+    _is_restart=true
+    printf "\n  ${green}${bold}⚡ ${mode} 모드로 재시작합니다...${reset}\n\n"
+    sleep 0.5
+    continue
+  fi
+  break
+  done  # end while true restart loop
+
   return 0
 }
