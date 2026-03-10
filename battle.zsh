@@ -1,9 +1,9 @@
 #!/bin/zsh
 # yolo battle - multi-agent battle mode
 # Usage: yolo battle [-p|-s|-c] "prompt"
-#   -p  parallel  (동시)   : all AIs run the same prompt simultaneously
-#   -s  sequential(순차)   : one AI at a time, /next to proceed
-#   -c  collaborative(협동): role-based pipeline (code→review→test) (default)
+#   -p  parallel  (동시)   : broadcast same message to all AIs (chat/planning)
+#   -s  sequential(순차)   : relay chain, each AI builds on previous (끝말잇기)
+#   -c  collaborative(협동): split roles + git worktree isolation, no file conflicts (co-op) (default)
 
 _yolo_battle() {
   # Receive context from parent yolo function via these globals:
@@ -53,15 +53,22 @@ _yolo_battle() {
   echo "0" > "$tmpdir/seq_turn.txt"
   rm -f "$tmpdir/seq_order_map.txt" "$tmpdir/run_"*.sh "$tmpdir/cmd_center.sh" "$tmpdir/monitor.sh" "$tmpdir/ai_panes.txt"
   rm -f "$tmpdir/status_"* "$tmpdir/diff_"*
+  # cleanup previous worktrees on restart
+  for _wt in "$tmpdir"/work_*; do
+    [ -d "$_wt" ] && git -C "$workdir" worktree remove "$_wt" 2>/dev/null
+  done
+  for _br in $(git -C "$workdir" branch --list "battle-coop-*" 2>/dev/null); do
+    git -C "$workdir" branch -D "$_br" 2>/dev/null
+  done
 
-  # ── role definitions for collaborative mode ──
+  # ── role definitions for co-op mode (file-scoped to avoid conflicts) ──
   local -a _roles _role_prompts
-  _roles=("Developer" "Reviewer" "Tester")
+  _roles=("Core" "Tests" "Config")
   if [ -n "$prompt" ]; then
     _role_prompts=(
-      "You are a developer. Write production-ready code for: ${prompt}"
-      "You are a senior code reviewer. The Developer has already implemented the code (their changes are attached below). Review the implementation, identify issues, and apply improvements directly. Task: ${prompt}"
-      "You are a QA engineer. The Developer has already implemented the code (their changes are attached below). Write comprehensive tests for the implementation. Task: ${prompt}"
+      "You are the core developer. Focus ONLY on main implementation/source code. Do NOT create or modify test files, config files, or documentation. Task: ${prompt}"
+      "You are the test engineer. Write tests and test utilities ONLY. Do NOT modify any implementation/source code. Only create/edit files in test directories or files with test/spec in their name. Task: ${prompt}"
+      "You are the DevOps/config engineer. Handle ONLY build config, documentation, CI/CD, and infrastructure files. Do NOT modify implementation code or test files. Task: ${prompt}"
     )
   fi
 
@@ -136,7 +143,16 @@ _yolo_battle() {
     local ticon="${_yolo_icons[$j]}"
     local script="$tmpdir/run_${tname}.sh"
     local toolworkdir="$tmpdir/work_${tname}"
-    mkdir -p "$toolworkdir"
+
+    # co-op mode: create git worktree for file isolation (no simultaneous writes)
+    if [[ "$mode" == "collaborative" ]]; then
+      git -C "$workdir" worktree add -q "$toolworkdir" -b "battle-coop-${tname}" HEAD 2>/dev/null || {
+        printf "${yellow}  ⚠ worktree failed for ${tname}, using shared dir${reset}\n"
+        mkdir -p "$toolworkdir"
+      }
+    else
+      mkdir -p "$toolworkdir"
+    fi
 
     {
       echo '#!/bin/zsh'
@@ -146,6 +162,12 @@ _yolo_battle() {
       echo "toolidx=$j"
       echo "mode=\"$mode\""
       echo "workdir=\"$workdir\""
+      # tool_workdir: worktree path for co-op, main workdir for others
+      if [[ "$mode" == "collaborative" ]]; then
+        echo "tool_workdir=\"$toolworkdir\""
+      else
+        echo "tool_workdir=\"$workdir\""
+      fi
       echo ""
 
       # banner
@@ -205,21 +227,7 @@ if [[ "$mode" == "sequential" ]]; then
   fi
 fi
 
-# ── collaborative mode: non-Developer waits for Developer ──
-if [[ "$mode" == "collaborative" ]] && [[ "$collab_role" != "Developer" ]]; then
-  echo "waiting" > "$statusfile"
-  printf '  \033[2m⏳ Developer 완료 대기중...\033[0m\n'
-  while [ ! -f "$tmpdir/collab_dev_done.txt" ]; do
-    sleep 0.5
-  done
-  printf '  \033[38;5;220m\033[1m▶ Developer 완료! 시작합니다.\033[0m\n\n'
-
-  _dev_diff_file="$tmpdir/diff_${collab_dev_tool}.txt"
-  if [ -f "$_dev_diff_file" ] && [ -s "$_dev_diff_file" ]; then
-    printf '  \033[38;5;51m\033[1m📋 Developer 변경사항:\033[0m\n'
-    printf '  \033[2m(%d lines of diff)\033[0m\n\n' "$(wc -l < "$_dev_diff_file")"
-  fi
-fi
+# ── collaborative mode: all roles run simultaneously ──
 WAIT_LOGIC
 
       # determine prompt based on mode
@@ -253,24 +261,15 @@ if [[ "$mode" == "sequential" ]] && [ -n "$my_turn" ] && [ "$my_turn" -gt 1 ]; t
   fi
 fi
 
-# collaborative mode: inject Developer's changes into Reviewer/Tester prompt
-if [[ "$mode" == "collaborative" ]] && [[ "$collab_role" != "Developer" ]]; then
-  _dev_diff_file="$tmpdir/diff_${collab_dev_tool}.txt"
-  if [ -f "$_dev_diff_file" ] && [ -s "$_dev_diff_file" ]; then
-    ctx=$(cat "$_dev_diff_file")
-    if [ $(echo "$ctx" | wc -l) -gt 300 ]; then
-      ctx="$(echo "$ctx" | head -300)"$'\n... (truncated)'
-    fi
-    prompt="${prompt}"$'\n\n'"[Developer's code changes - review/test this code]"$'\n'"${ctx}"
-  fi
-fi
+# collaborative mode: roles run simultaneously, no diff injection needed
 CONTEXT_INJECT
 
-      # mark as running + record start time
+      # mark as running + record start time + save git HEAD for diff tracking
       echo 'echo "running" > "$statusfile"'
       echo '_start_ts=$SECONDS'
       echo ""
-      echo "cd \"$workdir\""
+      echo 'cd "$tool_workdir"'
+      echo '_pre_head=$(git rev-parse HEAD 2>/dev/null)'
 
       # tool command (with or without prompt)
       cat << 'RUN_TOOL'
@@ -295,25 +294,13 @@ RUN_TOOL
 _elapsed=$(( SECONDS - _start_ts ))
 echo "done:${_elapsed}s" > "$statusfile"
 
-# ── capture changes made by this AI ──
-cd "$workdir"
-_diff=$(git diff 2>/dev/null)
-_diff_stat=$(git diff --stat 2>/dev/null)
+# ── capture changes made by this AI (committed + uncommitted) ──
+cd "$tool_workdir"
 
-if [ -n "$_diff" ]; then
-  # save diff for next AI's context
-  if [[ "$mode" == "sequential" ]] && [ -n "$my_turn" ]; then
-    echo "$_diff" > "$tmpdir/diff_turn_${my_turn}.txt"
-  fi
-  # save diff by tool name (for collaborative mode review)
-  echo "$_diff" > "$tmpdir/diff_${toolname}.txt"
-
-  printf '\n  \033[38;5;51m\033[1m📊 Changes:\033[0m\n'
-  echo "$_diff_stat" | while IFS= read -r line; do
-    printf '  \033[2m  %s\033[0m\n' "$line"
-  done
-
-  # auto-commit with tool name tag
+# first auto-commit any uncommitted changes
+_uncommitted=$(git diff 2>/dev/null)
+_staged=$(git diff --cached 2>/dev/null)
+if [ -n "$_uncommitted" ] || [ -n "$_staged" ]; then
   printf '\n  \033[38;5;220m\033[1m💾 Auto-committing changes...\033[0m\n'
   git add -A 2>/dev/null
   git commit -m "battle(${toolname}): ${mode} mode changes
@@ -328,16 +315,37 @@ Tool: ${toolname}" 2>/dev/null
   else
     printf '  \033[2m  (nothing to commit)\033[0m\n'
   fi
+fi
+
+# diff from pre-head captures ALL changes (AI's own commits + auto-commit above)
+_diff=""
+_diff_stat=""
+if [ -n "$_pre_head" ]; then
+  _diff=$(git diff "$_pre_head"..HEAD 2>/dev/null)
+  _diff_stat=$(git diff "$_pre_head"..HEAD --stat 2>/dev/null)
+fi
+
+if [ -n "$_diff" ]; then
+  # save diff for next AI's context (끝말잇기: chain context to next AI)
+  if [[ "$mode" == "sequential" ]] && [ -n "$my_turn" ]; then
+    echo "$_diff" > "$tmpdir/diff_turn_${my_turn}.txt"
+  fi
+  # save diff by tool name (for collaborative mode review)
+  echo "$_diff" > "$tmpdir/diff_${toolname}.txt"
+
+  printf '\n  \033[38;5;51m\033[1m📊 Changes:\033[0m\n'
+  echo "$_diff_stat" | while IFS= read -r line; do
+    printf '  \033[2m  %s\033[0m\n' "$line"
+  done
 else
   printf '\n  \033[2m  (no changes detected)\033[0m\n'
 fi
 
-# ── collaborative mode: Developer signals completion for Phase 2 ──
-if [[ "$mode" == "collaborative" ]] && [[ "$collab_role" == "Developer" ]]; then
-  # save diff even if empty (signal file doubles as ready marker)
-  [ -n "$_diff" ] || echo "" > "$tmpdir/diff_${toolname}.txt"
-  echo "$toolname" > "$tmpdir/collab_dev_done.txt"
-  printf '\n  \033[38;5;82m\033[1m🚀 Reviewer & Tester 시작 시그널 전송!\033[0m\n'
+# sequential mode: auto-advance to next turn
+if [[ "$mode" == "sequential" ]] && [ -n "$my_turn" ]; then
+  next_turn=$(( my_turn + 1 ))
+  echo "$next_turn" > "$tmpdir/seq_turn.txt"
+  printf '\n  \033[38;5;220m\033[1m▶ 다음 턴 (#%s) 자동 시작\033[0m\n' "$next_turn"
 fi
 
 printf '\n  \033[2m[완료] 아무 키나 누르세요...\033[0m'
@@ -362,7 +370,7 @@ DONE_LOGIC
       mode_color="$cyan"
       ;;
     collaborative)
-      mode_label="COLLABORATIVE (협동)"
+      mode_label="CO-OP (협동)"
       mode_icon="🤝"
       mode_color="$green"
       ;;
@@ -421,12 +429,13 @@ DONE_LOGIC
     echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/focus N${rst}  N번 pane 포커스   ${prp}${bld}║${rst}\n"'
 
     if [[ "$mode" == "sequential" ]]; then
-      echo 'printf "  ${prp}${bld}║${rst}  ${ylw}${bld}/next${rst}     다음 AI 시작 ${cyn}★${rst}  ${prp}${bld}║${rst}\n"'
+      echo 'printf "  ${prp}${bld}║${rst}  ${ylw}${bld}/next X${rst}   다음+프롬프트${cyn}★${rst} ${prp}${bld}║${rst}\n"'
       echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/skip${rst}     현재 AI 건너뛰기${prp}${bld}║${rst}\n"'
       echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/order N${rst}  순서 변경       ${prp}${bld}║${rst}\n"'
     fi
 
     if [[ "$mode" == "collaborative" ]]; then
+      echo 'printf "  ${prp}${bld}║${rst}  ${ylw}${bld}/merge${rst}   브랜치 머지 ${cyn}★${rst}  ${prp}${bld}║${rst}\n"'
       echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/swap N M${rst} 역할 교체       ${prp}${bld}║${rst}\n"'
       echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/role N X${rst} 역할 변경       ${prp}${bld}║${rst}\n"'
       echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/roles${rst}    역할 확인        ${prp}${bld}║${rst}\n"'
@@ -539,11 +548,11 @@ else
       ;;
     sequential)
       printf "  ${prp}${bld}║${rst}  ${cyn}${bld}➡️  SEQUENTIAL${rst} ${dm}순차 모드${rst}          ${prp}${bld}║${rst}\n"
-      printf "  ${prp}${bld}║${rst}  ${dm}한 AI씩 순서대로 실행${rst}              ${prp}${bld}║${rst}\n"
+      printf "  ${prp}${bld}║${rst}  ${dm}끝말잇기: 이전 결과 이어받기${rst}       ${prp}${bld}║${rst}\n"
       ;;
     collaborative)
-      printf "  ${prp}${bld}║${rst}  ${grn}${bld}🤝 COLLABORATIVE${rst} ${dm}협동 모드${rst}        ${prp}${bld}║${rst}\n"
-      printf "  ${prp}${bld}║${rst}  ${dm}역할별 동시 작업${rst}                   ${prp}${bld}║${rst}\n"
+      printf "  ${prp}${bld}║${rst}  ${grn}${bld}🤝 CO-OP${rst} ${dm}협동 모드${rst}                ${prp}${bld}║${rst}\n"
+      printf "  ${prp}${bld}║${rst}  ${dm}역할분리 + worktree 격리${rst}           ${prp}${bld}║${rst}\n"
       ;;
   esac
 
@@ -556,12 +565,13 @@ else
   printf "  ${prp}${bld}║${rst}   ${ylw}/focus N${rst}   N번 pane 포커스        ${prp}${bld}║${rst}\n"
 
   if [[ "$mode" == "sequential" ]]; then
-    printf "  ${prp}${bld}║${rst}   ${ylw}${bld}/next${rst}      다음 AI 시작 ${cyn}★${rst}       ${prp}${bld}║${rst}\n"
+    printf "  ${prp}${bld}║${rst}   ${ylw}${bld}/next X${rst}    다음+새프롬프트${cyn}★${rst}    ${prp}${bld}║${rst}\n"
     printf "  ${prp}${bld}║${rst}   ${ylw}/skip${rst}      현재 AI 건너뛰기     ${prp}${bld}║${rst}\n"
     printf "  ${prp}${bld}║${rst}   ${ylw}/order N..${rst} 순서 변경 ${dm}(예:2 1 3)${rst}${prp}${bld}║${rst}\n"
   fi
 
   if [[ "$mode" == "collaborative" ]]; then
+    printf "  ${prp}${bld}║${rst}   ${ylw}${bld}/merge${rst}    브랜치 머지 ${cyn}★${rst}        ${prp}${bld}║${rst}\n"
     printf "  ${prp}${bld}║${rst}   ${ylw}/swap N M${rst}  N↔M 역할 교체        ${prp}${bld}║${rst}\n"
     printf "  ${prp}${bld}║${rst}   ${ylw}/role N X${rst}  N번 AI 역할 변경     ${prp}${bld}║${rst}\n"
     printf "  ${prp}${bld}║${rst}   ${ylw}/roles${rst}     현재 역할 확인        ${prp}${bld}║${rst}\n"
@@ -706,15 +716,26 @@ _do_next() {
     printf "  ${red}순차 모드에서만 사용 가능합니다${rst}\n"
     return
   fi
+  local new_prompt="$*"
   local cur=$(cat "$tmpdir/seq_turn.txt" 2>/dev/null)
   local next=$(( cur + 1 ))
   if [ $next -gt ${#_cmd_seq_order[@]} ]; then
     printf "  ${grn}${bld}✔ 모든 AI가 완료되었습니다${rst}\n"
     return
   fi
+  # 끝말잇기: update prompt for next AI if provided
+  if [ -n "$new_prompt" ]; then
+    printf '%s' "$new_prompt" > "$tmpdir/prompt.txt"
+    printf "  ${ylw}📝 새 프롬프트:${rst} ${dm}${new_prompt}${rst}\n"
+  fi
   echo "$next" > "$tmpdir/seq_turn.txt"
   local next_tool_idx=${_cmd_seq_order[$next]}
   printf "  ${cyn}${bld}▶ #${next} ${_cmd_icons[$next_tool_idx]} ${_cmd_tools[$next_tool_idx]} 시작${rst}\n"
+  if [ -n "$new_prompt" ]; then
+    printf "  ${dm}(이전 AI 변경사항 + 새 프롬프트 전달됨)${rst}\n"
+  else
+    printf "  ${dm}(이전 AI 변경사항 + 기존 프롬프트 전달됨)${rst}\n"
+  fi
 }
 
 _do_skip() {
@@ -821,6 +842,52 @@ _do_mode_switch() {
   tmux kill-session -t "$session" 2>/dev/null
 }
 
+_do_merge() {
+  if [[ "$mode" != "collaborative" ]]; then
+    printf "  ${red}co-op 모드에서만 사용 가능합니다${rst}\n"
+    return
+  fi
+  cd "$workdir"
+  local merged=0 conflicts=0
+  printf "\n  ${cyn}${bld}🔀 Co-op 브랜치 머지 시작${rst}\n"
+  for ((mi=1; mi<=${#_cmd_tools[@]}; mi++)); do
+    local branch="battle-coop-${_cmd_tools[$mi]}"
+    if git rev-parse --verify "$branch" >/dev/null 2>&1; then
+      # check if branch has changes
+      local branch_diff=$(git diff HEAD..."$branch" --stat 2>/dev/null)
+      if [ -z "$branch_diff" ]; then
+        printf "  ${dm}${_cmd_icons[$mi]} ${_cmd_tools[$mi]}: (변경 없음)${rst}\n"
+        continue
+      fi
+      printf "  ${cyn}${_cmd_icons[$mi]} ${_cmd_tools[$mi]} 머지 중...${rst}"
+      if git merge --no-edit "$branch" 2>/dev/null; then
+        printf " ${grn}✔${rst}\n"
+        merged=$((merged + 1))
+      else
+        printf " ${red}✖ 충돌!${rst}\n"
+        git merge --abort 2>/dev/null
+        conflicts=$((conflicts + 1))
+        printf "  ${dm}  수동 머지 필요: git merge ${branch}${rst}\n"
+      fi
+    fi
+  done
+  printf "\n  ${grn}${bld}✔ 머지 완료: ${merged}개${rst}"
+  [ $conflicts -gt 0 ] && printf "  ${red}${bld}✖ 충돌: ${conflicts}개${rst}"
+  printf "\n"
+  # cleanup worktrees (keep branches in case of conflict)
+  if [ $conflicts -eq 0 ]; then
+    for ((mi=1; mi<=${#_cmd_tools[@]}; mi++)); do
+      local tname="${_cmd_tools[$mi]}"
+      git worktree remove "$tmpdir/work_${tname}" 2>/dev/null
+      git branch -D "battle-coop-${tname}" 2>/dev/null
+    done
+    printf "  ${dm}워크트리 정리 완료${rst}\n"
+  else
+    printf "  ${ylw}충돌 브랜치는 수동 머지 후 정리하세요${rst}\n"
+  fi
+  printf "\n"
+}
+
 # sequential mode: auto-start first AI
 if [[ "$mode" == "sequential" ]]; then
   echo "1" > "$tmpdir/seq_turn.txt"
@@ -915,8 +982,13 @@ while true; do
     /diff)
       _show_diffs
       ;;
-    /next)
-      _do_next
+    /next|/next\ *)
+      local next_prompt="${input#/next}"
+      next_prompt="${next_prompt# }"
+      _do_next $next_prompt
+      ;;
+    /merge)
+      _do_merge
       ;;
     /skip)
       _do_skip
@@ -973,9 +1045,10 @@ while true; do
       ;;
     /help)
       printf "\n  ${ylw}/status${rst}  상태  ${ylw}/diff${rst}  변경사항  ${ylw}/save${rst}  저장\n"
-      printf "  ${ylw}/next${rst}  다음  ${ylw}/skip${rst}  건너뛰기  ${ylw}/prompt X${rst}  변경\n"
+      printf "  ${ylw}/next X${rst} 다음+프롬프트  ${ylw}/skip${rst} 건너뛰기\n"
+      printf "  ${ylw}/merge${rst}  co-op 머지  ${ylw}/prompt X${rst} 프롬프트 변경\n"
       printf "  ${ylw}/focus N${rst} 포커스  ${ylw}/quit${rst}  종료\n"
-      printf "  ${ylw}/mode p${rst}  동시  ${ylw}/mode s${rst}  순차  ${ylw}/mode c${rst}  협동\n"
+      printf "  ${ylw}/mode p${rst}  동시  ${ylw}/mode s${rst}  순차  ${ylw}/mode c${rst}  co-op\n"
       printf "  ${ylw}/swap N M${rst} 역할교체  ${ylw}/order N..${rst} 순서변경\n"
       printf "  ${ylw}/role N X${rst} 역할변경  ${ylw}/roles${rst}  역할확인\n"
       printf "  ${dm}↑/↓ 화살표: 이전 입력 / 지우기${rst}\n\n"
@@ -1152,7 +1225,7 @@ CMD_BODY
   case "$mode" in
     parallel)      mode_status_label="⚡ PARALLEL" ;;
     sequential)    mode_status_label="➡️  SEQUENTIAL" ;;
-    collaborative) mode_status_label="🤝 COLLAB" ;;
+    collaborative) mode_status_label="🤝 CO-OP" ;;
   esac
 
   tmux set-option -t "$session" status on 2>/dev/null
@@ -1262,6 +1335,11 @@ MONITOR_BODY
 
   # cleanup
   kill $monitor_pid 2>/dev/null
+
+  # cleanup co-op worktrees (if not already merged)
+  for _wt in "$tmpdir"/work_*; do
+    [ -d "$_wt" ] && git -C "$workdir" worktree remove "$_wt" 2>/dev/null
+  done
 
   # check for mode restart request
   if [ -f "$tmpdir/new_mode.txt" ]; then
