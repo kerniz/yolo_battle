@@ -47,7 +47,7 @@ printf "\n"
 if [ $found -eq 0 ]; then
   printf "  ${RED}${BOLD}✖  No AI CLI found. Install at least one:${RESET}\n"
   printf "  ${DIM}  npm install -g @anthropic-ai/claude-code  ${RESET}${DIM}# Claude${RESET}\n"
-  printf "  ${DIM}  npm install -g @anthropic-ai/claude-code  ${RESET}${DIM}# Gemini${RESET}\n"
+  printf "  ${DIM}  npm install -g @google/gemini-cli         ${RESET}${DIM}# Gemini${RESET}\n"
   printf "  ${DIM}  npm install -g @openai/codex              ${RESET}${DIM}# Codex${RESET}\n\n"
   exit 1
 fi

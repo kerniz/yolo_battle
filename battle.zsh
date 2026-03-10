@@ -1,9 +1,9 @@
 #!/bin/zsh
 # yolo battle - multi-agent battle mode
 # Usage: yolo battle [-p|-s|-c] "prompt"
-#   -p  parallel  (동시)   : all AIs run the same prompt simultaneously (default)
+#   -p  parallel  (동시)   : all AIs run the same prompt simultaneously
 #   -s  sequential(순차)   : one AI at a time, /next to proceed
-#   -c  collaborative(협동): role-based pipeline (code→review→test)
+#   -c  collaborative(협동): role-based pipeline (code→review→test) (default)
 
 _yolo_battle() {
   # Receive context from parent yolo function via these globals:
@@ -11,7 +11,7 @@ _yolo_battle() {
   #   reset, bold, dim, red, orange, yellow, green, cyan, blue, purple, pink, white (colors)
 
   # ── parse mode flag ──
-  local mode="parallel"
+  local mode="collaborative"
   local -a _seq_order  # custom order for sequential mode
   case "$1" in
     -p|--parallel)      mode="parallel"; shift ;;
@@ -41,6 +41,10 @@ _yolo_battle() {
   printf '%s' "$mode" > "$tmpdir/mode.txt"
   printf '%s' "$workdir" > "$tmpdir/workdir.txt"
   echo "0" > "$tmpdir/seq_turn.txt"
+
+  # save initial git state for diff tracking
+  git -C "$workdir" diff HEAD --stat > "$tmpdir/git_baseline.txt" 2>/dev/null
+  git -C "$workdir" rev-parse HEAD > "$tmpdir/git_head.txt" 2>/dev/null
 
   # ── role definitions for collaborative mode ──
   local -a _roles _role_prompts
@@ -177,12 +181,35 @@ if [[ "$mode" == "sequential" ]]; then
     sleep 0.5
   done
   printf '  \033[38;5;220m\033[1m▶ Your turn!\033[0m\n\n'
+
+  # ── inject previous AI's changes as context ──
+  prev_diff_file="$tmpdir/diff_turn_$((my_turn - 1)).txt"
+  if [ -f "$prev_diff_file" ] && [ -s "$prev_diff_file" ]; then
+    printf '  \033[38;5;51m\033[1m📋 Previous AI changes:\033[0m\n'
+    printf '  \033[2m%.60s...\033[0m\n' "$(head -1 "$prev_diff_file")"
+    printf '  \033[2m(%d lines of diff)\033[0m\n\n' "$(wc -l < "$prev_diff_file")"
+  fi
 fi
 WAIT_LOGIC
 
       # determine prompt based on mode
       echo 'prompt=$(cat "$tmpdir/prompt.txt")'
       echo ""
+
+      # inject previous changes into prompt for sequential mode
+      cat << 'CONTEXT_INJECT'
+if [[ "$mode" == "sequential" ]] && [ -n "$my_turn" ] && [ "$my_turn" -gt 1 ]; then
+  prev_diff="$tmpdir/diff_turn_$((my_turn - 1)).txt"
+  if [ -f "$prev_diff" ] && [ -s "$prev_diff" ]; then
+    ctx=$(cat "$prev_diff")
+    # truncate if too long (keep first 200 lines)
+    if [ $(echo "$ctx" | wc -l) -gt 200 ]; then
+      ctx="$(echo "$ctx" | head -200)"$'\n... (truncated)'
+    fi
+    prompt="${prompt}"$'\n\n'"[Context: Changes made by previous AI]"$'\n'"${ctx}"
+  fi
+fi
+CONTEXT_INJECT
 
       if [[ "$mode" == "collaborative" ]]; then
         local role="${_roles[$j]:-Developer}"
@@ -219,16 +246,47 @@ else
 fi
 RUN_TOOL
 
-      # mark as done
+      # mark as done + capture diff + auto-commit
       cat << 'DONE_LOGIC'
 
 _elapsed=$(( SECONDS - _start_ts ))
 echo "done:${_elapsed}s" > "$statusfile"
 
-# sequential mode: advance turn
-if [[ "$mode" == "sequential" ]]; then
-  next_turn=$(( my_turn + 1 ))
-  echo "$next_turn" > "$tmpdir/seq_turn.txt"
+# ── capture changes made by this AI ──
+cd "$workdir"
+_diff=$(git diff 2>/dev/null)
+_diff_stat=$(git diff --stat 2>/dev/null)
+
+if [ -n "$_diff" ]; then
+  # save diff for next AI's context
+  if [[ "$mode" == "sequential" ]] && [ -n "$my_turn" ]; then
+    echo "$_diff" > "$tmpdir/diff_turn_${my_turn}.txt"
+  fi
+  # save diff by tool name (for collaborative mode review)
+  echo "$_diff" > "$tmpdir/diff_${toolname}.txt"
+
+  printf '\n  \033[38;5;51m\033[1m📊 Changes:\033[0m\n'
+  echo "$_diff_stat" | while IFS= read -r line; do
+    printf '  \033[2m  %s\033[0m\n' "$line"
+  done
+
+  # auto-commit with tool name tag
+  printf '\n  \033[38;5;220m\033[1m💾 Auto-committing changes...\033[0m\n'
+  git add -A 2>/dev/null
+  git commit -m "battle(${toolname}): ${mode} mode changes
+
+Prompt: $(head -1 "$tmpdir/prompt.txt" 2>/dev/null)
+Mode: ${mode}
+Tool: ${toolname}" 2>/dev/null
+
+  if [ $? -eq 0 ]; then
+    _commit_hash=$(git rev-parse --short HEAD 2>/dev/null)
+    printf '  \033[38;5;82m\033[1m✔ Committed: %s\033[0m\n' "$_commit_hash"
+  else
+    printf '  \033[2m  (nothing to commit)\033[0m\n'
+  fi
+else
+  printf '\n  \033[2m  (no changes detected)\033[0m\n'
 fi
 
 printf '\n  \033[2m[완료] 아무 키나 누르세요...\033[0m'
@@ -292,6 +350,7 @@ DONE_LOGIC
     echo "cnt=$cnt"
     echo "mode=\"$mode\""
     echo "savedir=\"$savedir\""
+    echo "workdir=\"$workdir\""
 
     # embed tool names for display
     echo "_cmd_tools=("
@@ -309,6 +368,9 @@ DONE_LOGIC
     echo ")"
 
     cat << 'CMD_BODY'
+
+# Ensure ZLE is loaded for vared and proper multibyte handling
+zmodload zsh/zle 2>/dev/null
 
 rst=$'\033[0m'
 bld=$'\033[1m'
@@ -349,6 +411,7 @@ esac
 printf "  ${prp}${bld}╠══════════════════════════════════════╣${rst}\n"
 printf "  ${prp}${bld}║${rst}  ${cyn}명령어:${rst}                            ${prp}${bld}║${rst}\n"
 printf "  ${prp}${bld}║${rst}   ${ylw}/status${rst}    각 AI 상태 확인        ${prp}${bld}║${rst}\n"
+printf "  ${prp}${bld}║${rst}   ${ylw}/diff${rst}      각 AI 변경사항 확인   ${prp}${bld}║${rst}\n"
 printf "  ${prp}${bld}║${rst}   ${ylw}/save${rst}      결과 저장              ${prp}${bld}║${rst}\n"
 printf "  ${prp}${bld}║${rst}   ${ylw}/prompt X${rst}  프롬프트 변경          ${prp}${bld}║${rst}\n"
 printf "  ${prp}${bld}║${rst}   ${ylw}/focus N${rst}   N번 pane 포커스        ${prp}${bld}║${rst}\n"
@@ -356,9 +419,17 @@ printf "  ${prp}${bld}║${rst}   ${ylw}/focus N${rst}   N번 pane 포커스    
 if [[ "$mode" == "sequential" ]]; then
   printf "  ${prp}${bld}║${rst}   ${ylw}${bld}/next${rst}      다음 AI 시작 ${cyn}★${rst}       ${prp}${bld}║${rst}\n"
   printf "  ${prp}${bld}║${rst}   ${ylw}/skip${rst}      현재 AI 건너뛰기     ${prp}${bld}║${rst}\n"
+  printf "  ${prp}${bld}║${rst}   ${ylw}/order N..${rst} 순서 변경 ${dm}(예:2 1 3)${rst}${prp}${bld}║${rst}\n"
 fi
 
-printf "  ${prp}${bld}║${rst}   ${ylw}/mode X${rst}    모드 변경 후 재시작   ${prp}${bld}║${rst}\n"
+if [[ "$mode" == "collaborative" ]]; then
+  printf "  ${prp}${bld}║${rst}   ${ylw}/swap N M${rst}  N↔M 역할 교체        ${prp}${bld}║${rst}\n"
+  printf "  ${prp}${bld}║${rst}   ${ylw}/role N X${rst}  N번 AI 역할 변경     ${prp}${bld}║${rst}\n"
+  printf "  ${prp}${bld}║${rst}   ${ylw}/roles${rst}     현재 역할 확인        ${prp}${bld}║${rst}\n"
+fi
+
+printf "  ${prp}${bld}║${rst}   ${ylw}/mode X${rst}    모드 변경 ${dm}(p/s/c)${rst}   ${prp}${bld}║${rst}\n"
+printf "  ${prp}${bld}║${rst}   ${ylw}/help${rst}      도움말                ${prp}${bld}║${rst}\n"
 printf "  ${prp}${bld}║${rst}   ${ylw}/quit${rst}      세션 종료              ${prp}${bld}║${rst}\n"
 printf "  ${prp}${bld}╠══════════════════════════════════════╣${rst}\n"
 printf "  ${prp}${bld}║${rst}  ${cyn}단축키:${rst}                            ${prp}${bld}║${rst}\n"
@@ -409,13 +480,74 @@ _show_status() {
   printf "\n"
 }
 
+_send_to_pane() {
+  local pane="$1"
+  local tool="$2"
+  local text="$3"
+  # Use -l for literal string (better for multibyte)
+  tmux send-keys -t "${pane}" -l "$text" 2>/dev/null
+  case "$tool" in
+    gemini)
+      # Gemini CLI needs multiple enters to submit
+      tmux send-keys -t "${pane}" Enter Enter Enter 2>/dev/null
+      ;;
+    codex)
+      # Codex CLI needs double enter to submit
+      tmux send-keys -t "${pane}" Enter Enter 2>/dev/null
+      ;;
+    *)
+      tmux send-keys -t "${pane}" Enter 2>/dev/null
+      ;;
+  esac
+}
+
+_show_diffs() {
+  printf "\n"
+  local has_diff=false
+  for ((di=1; di<=${#_cmd_tools[@]}; di++)); do
+    local dname="${_cmd_tools[$di]}"
+    local dicon="${_cmd_icons[$di]}"
+    local dfile="$tmpdir/diff_${dname}.txt"
+    if [ -f "$dfile" ] && [ -s "$dfile" ]; then
+      has_diff=true
+      local dlines=$(wc -l < "$dfile" | tr -d ' ')
+      printf "  ${cyn}${bld}${dicon} ${dname}${rst} ${dm}(${dlines} lines)${rst}\n"
+      # show colorized diff preview (first 20 lines)
+      head -20 "$dfile" | while IFS= read -r dline; do
+        case "$dline" in
+          +*) printf "    ${grn}%s${rst}\n" "$dline" ;;
+          -*) printf "    ${red}%s${rst}\n" "$dline" ;;
+          @@*) printf "    ${cyn}%s${rst}\n" "$dline" ;;
+          *)  printf "    ${dm}%s${rst}\n" "$dline" ;;
+        esac
+      done
+      [ "$dlines" -gt 20 ] && printf "    ${dm}... (+$((dlines - 20)) more lines)${rst}\n"
+      printf "\n"
+    else
+      printf "  ${dm}${dicon} ${dname}: (변경 없음)${rst}\n"
+    fi
+  done
+  # also show current uncommitted changes
+  local live_diff=$(git -C "$workdir" diff --stat 2>/dev/null)
+  if [ -n "$live_diff" ]; then
+    printf "  ${ylw}${bld}📊 현재 uncommitted 변경:${rst}\n"
+    echo "$live_diff" | while IFS= read -r sl; do
+      printf "    ${dm}%s${rst}\n" "$sl"
+    done
+    printf "\n"
+  fi
+  if ! $has_diff; then
+    printf "  ${dm}아직 변경사항이 없습니다${rst}\n\n"
+  fi
+}
+
 _do_save() {
   mkdir -p "$savedir"
   # capture each AI pane's output
   for ((si=0; si<${#ai_panes[@]}; si++)); do
     local pidx="${ai_panes[$((si+1))]}"
     local tname="${_cmd_tools[$((si+1))]}"
-    tmux capture-pane -t "${session}:0.${pidx}" -p -S -500 > "$savedir/${tname}.txt" 2>/dev/null
+    tmux capture-pane -t "${pidx}" -p -S -500 > "$savedir/${tname}.txt" 2>/dev/null
   done
   # save prompt
   cp "$tmpdir/prompt.txt" "$savedir/prompt.txt" 2>/dev/null
@@ -463,15 +595,218 @@ _do_skip() {
   fi
 }
 
+_do_swap() {
+  if [[ "$mode" != "collaborative" ]]; then
+    printf "  ${red}협동 모드에서만 사용 가능합니다${rst}\n"
+    return
+  fi
+  local a=$1 b=$2
+  if [[ ! "$a" =~ ^[0-9]+$ ]] || [[ ! "$b" =~ ^[0-9]+$ ]] || \
+     [ "$a" -lt 1 ] || [ "$a" -gt ${#_cmd_tools[@]} ] || \
+     [ "$b" -lt 1 ] || [ "$b" -gt ${#_cmd_tools[@]} ] || \
+     [ "$a" -eq "$b" ]; then
+    printf "  ${red}사용법: /swap N M (1~${#_cmd_tools[@]}, N≠M)${rst}\n"
+    return
+  fi
+  local tmp_role="${_cmd_roles[$a]}"
+  _cmd_roles[$a]="${_cmd_roles[$b]}"
+  _cmd_roles[$b]="$tmp_role"
+  tmux select-pane -t "${ai_panes[$a]}" -T "${_cmd_icons[$a]} ${(U)_cmd_tools[$a]} (${_cmd_roles[$a]})" 2>/dev/null
+  tmux select-pane -t "${ai_panes[$b]}" -T "${_cmd_icons[$b]} ${(U)_cmd_tools[$b]} (${_cmd_roles[$b]})" 2>/dev/null
+  printf "  ${grn}${bld}✔ 역할 교체:${rst} ${_cmd_icons[$a]} ${_cmd_tools[$a]}=${ylw}${_cmd_roles[$a]}${rst} ↔ ${_cmd_icons[$b]} ${_cmd_tools[$b]}=${ylw}${_cmd_roles[$b]}${rst}\n"
+}
+
+_do_reorder() {
+  if [[ "$mode" != "sequential" ]]; then
+    printf "  ${red}순차 모드에서만 사용 가능합니다${rst}\n"
+    return
+  fi
+  local -a new_order
+  new_order=( $@ )
+  if [ ${#new_order[@]} -ne ${#_cmd_seq_order[@]} ]; then
+    printf "  ${red}사용법: /order 2 1 3 (모든 번호 필요)${rst}\n"
+    return
+  fi
+  local valid=true
+  for ((oi=1; oi<=${#_cmd_seq_order[@]}; oi++)); do
+    local found=false
+    for v in "${new_order[@]}"; do
+      [ "$v" = "$oi" ] && found=true
+    done
+    $found || valid=false
+  done
+  if ! $valid; then
+    printf "  ${red}1~${#_cmd_seq_order[@]} 사이 숫자를 모두 입력하세요${rst}\n"
+    return
+  fi
+  _cmd_seq_order=( "${new_order[@]}" )
+  echo "1" > "$tmpdir/seq_turn.txt"
+  for ((oi=1; oi<=${#_cmd_seq_order[@]}; oi++)); do
+    local tidx=${_cmd_seq_order[$oi]}
+    tmux select-pane -t "${ai_panes[$tidx]}" -T "#${oi} ${_cmd_icons[$tidx]} ${(U)_cmd_tools[$tidx]}" 2>/dev/null
+  done
+  printf "  ${grn}${bld}✔ 순서 변경:${rst} "
+  for ((oi=1; oi<=${#_cmd_seq_order[@]}; oi++)); do
+    local tidx=${_cmd_seq_order[$oi]}
+    [ $oi -gt 1 ] && printf " ${dm}→${rst} "
+    printf "${_cmd_icons[$tidx]} ${_cmd_tools[$tidx]}"
+  done
+  printf "\n  ${ylw}${bld}▶ #1부터 재시작${rst}\n"
+}
+
+_do_mode_switch() {
+  local new_mode="$1"
+  local mode_ok=false
+
+  case "$new_mode" in
+    p|parallel)      new_mode="parallel"; mode_ok=true ;;
+    s|sequential)    new_mode="sequential"; mode_ok=true ;;
+    c|collaborative) new_mode="collaborative"; mode_ok=true ;;
+  esac
+
+  if ! $mode_ok; then
+    printf "  ${red}알 수 없는 모드: ${new_mode}${rst}\n"
+    printf "  ${dm}사용 가능: p(parallel) s(sequential) c(collaborative)${rst}\n"
+    return
+  fi
+
+  if [[ "$mode" == "$new_mode" ]]; then
+    printf "  ${ylw}이미 ${new_mode} 모드입니다${rst}\n"
+    return
+  fi
+
+  local old_mode="$mode"
+  mode="$new_mode"
+  printf '%s' "$mode" > "$tmpdir/mode.txt"
+
+  # update pane titles based on new mode
+  for ((mi=1; mi<=${#_cmd_tools[@]}; mi++)); do
+    local pane_id="${ai_panes[$mi]}"
+    case "$mode" in
+      collaborative)
+        tmux select-pane -t "${pane_id}" -T "${_cmd_icons[$mi]} ${(U)_cmd_tools[$mi]} (${_cmd_roles[$mi]:-Dev})" 2>/dev/null
+        ;;
+      sequential)
+        tmux select-pane -t "${pane_id}" -T "#${mi} ${_cmd_icons[$mi]} ${(U)_cmd_tools[$mi]}" 2>/dev/null
+        ;;
+      *)
+        tmux select-pane -t "${pane_id}" -T "${_cmd_icons[$mi]} ${(U)_cmd_tools[$mi]}" 2>/dev/null
+        ;;
+    esac
+  done
+
+  # update tmux status bar mode label
+  local mode_status_label
+  case "$mode" in
+    parallel)      mode_status_label="⚡ PARALLEL" ;;
+    sequential)    mode_status_label="➡️  SEQUENTIAL" ;;
+    collaborative) mode_status_label="🤝 COLLAB" ;;
+  esac
+  tmux set-option -t "$session" status-left \
+    " #[fg=colour196,bold]⚔️  BATTLE#[default] #[fg=colour240]│#[default] #[fg=colour220]${mode_status_label}#[default]  " 2>/dev/null
+
+  # sequential mode: init turn tracking
+  if [[ "$mode" == "sequential" ]]; then
+    echo "1" > "$tmpdir/seq_turn.txt"
+    printf "\n  ${cyn}${bld}➡️  SEQUENTIAL 모드로 전환${rst}\n"
+    printf "  ${dm}순차 실행 시작. /next로 다음 AI 진행${rst}\n"
+    printf "  ${cyn}${bld}📋 실행 순서:${rst}\n"
+    for ((r=1; r<=${#_cmd_seq_order[@]}; r++)); do
+      local oi=${_cmd_seq_order[$r]}
+      printf "   ${dm}#${r}${rst} ${_cmd_icons[$oi]} ${_cmd_tools[$oi]}\n"
+    done
+    printf "  ${ylw}${bld}▶ #1 시작${rst}\n"
+  elif [[ "$mode" == "parallel" ]]; then
+    printf "\n  ${ylw}${bld}⚡ PARALLEL 모드로 전환${rst}\n"
+    printf "  ${dm}입력이 모든 AI에 동시 전송됩니다${rst}\n"
+  elif [[ "$mode" == "collaborative" ]]; then
+    printf "\n  ${grn}${bld}🤝 COLLABORATIVE 모드로 전환${rst}\n"
+    printf "  ${grn}${bld}📋 역할 배정:${rst}\n"
+    for ((r=1; r<=${#_cmd_tools[@]}; r++)); do
+      printf "   ${_cmd_icons[$r]} ${_cmd_tools[$r]}: ${ylw}${_cmd_roles[$r]:-Dev}${rst}\n"
+    done
+  fi
+  printf "\n"
+}
+
 # sequential mode: auto-start first AI
 if [[ "$mode" == "sequential" ]]; then
   echo "1" > "$tmpdir/seq_turn.txt"
 fi
 
+# better line editing for multibyte input (e.g., Korean)
+setopt multibyte 2>/dev/null
+stty erase '^?' 2>/dev/null
+# bind both DEL (^?) and BS (^H) for backspace compatibility across terminals/tmux
+bindkey '^?' backward-delete-char 2>/dev/null
+bindkey '^H' backward-delete-char 2>/dev/null
+bindkey '\b' backward-delete-char 2>/dev/null
+
+# ensure correct terminal width for vared line wrapping
+COLUMNS=$(tput cols 2>/dev/null || echo 80)
+trap 'COLUMNS=$(tput cols 2>/dev/null || echo 80)' WINCH
+
+# ── command history + arrow key widgets ──
+typeset -a _cmd_history
+_cmd_hist_idx=0
+
+_cmd_hist_up() {
+  if (( _cmd_hist_idx < ${#_cmd_history[@]} )); then
+    (( _cmd_hist_idx++ ))
+    BUFFER="${_cmd_history[-$_cmd_hist_idx]}"
+    CURSOR=${#BUFFER}
+  fi
+}
+zle -N _cmd_hist_up
+
+_cmd_hist_down() {
+  if (( _cmd_hist_idx > 0 )); then
+    (( _cmd_hist_idx-- ))
+    if (( _cmd_hist_idx == 0 )); then
+      BUFFER=""
+    else
+      BUFFER="${_cmd_history[-$_cmd_hist_idx]}"
+    fi
+    CURSOR=${#BUFFER}
+  else
+    BUFFER=""
+    CURSOR=0
+  fi
+}
+zle -N _cmd_hist_down
+
+# kill whole line widget (Ctrl-U)
+_cmd_kill_line() {
+  BUFFER=""
+  CURSOR=0
+}
+zle -N _cmd_kill_line
+
+bindkey '^[[A' _cmd_hist_up     # Up arrow
+bindkey '^[OA' _cmd_hist_up     # Up arrow (alt escape)
+bindkey '^[[B' _cmd_hist_down   # Down arrow
+bindkey '^[OB' _cmd_hist_down   # Down arrow (alt escape)
+bindkey '^U'   _cmd_kill_line   # Ctrl-U to clear line
+
 # input loop
 while true; do
-  printf "  ${prp}${bld}▸${rst} "
-  read -r input || break
+  # Use vared for better multibyte/Korean input handling
+  # %{...%} wraps non-printing chars so zle calculates cursor position correctly
+  input=""
+  if vared -p "  %{${prp}${bld}%}▸%{${rst}%} " -c input 2>/dev/null; then
+    # clean up display artifacts from wrapped lines
+    printf '\033[J'
+  else
+    # fallback if vared fails
+    printf "  ${prp}${bld}▸${rst} "
+    read -r input || break
+  fi
+
+  # save to history (non-empty input only)
+  if [[ -n "$input" ]]; then
+    _cmd_history+=("$input")
+    _cmd_hist_idx=0
+  fi
 
   case "$input" in
     /quit)
@@ -484,6 +819,9 @@ while true; do
       ;;
     /save)
       _do_save
+      ;;
+    /diff)
+      _show_diffs
       ;;
     /next)
       _do_next
@@ -500,15 +838,59 @@ while true; do
       local pnum="${input#/focus }"
       tmux select-pane -t "${session}:0.${pnum}" 2>/dev/null
       ;;
+    /role\ *)
+      local role_args="${input#/role }"
+      local role_num="${role_args%% *}"
+      local role_name="${role_args#* }"
+      if [[ "$mode" != "collaborative" ]]; then
+        printf "  ${red}협동 모드에서만 사용 가능합니다${rst}\n"
+      elif [[ ! "$role_num" =~ ^[0-9]+$ ]] || [ "$role_num" -lt 1 ] || [ "$role_num" -gt ${#_cmd_tools[@]} ]; then
+        printf "  ${red}잘못된 번호. 1~${#_cmd_tools[@]} 사이 입력${rst}\n"
+      elif [[ "$role_num" == "$role_name" ]]; then
+        printf "  ${red}사용법: /role N 역할명${rst}\n"
+      else
+        _cmd_roles[$role_num]="$role_name"
+        tmux select-pane -t "${ai_panes[$role_num]}" -T "${_cmd_icons[$role_num]} ${(U)_cmd_tools[$role_num]} (${role_name})" 2>/dev/null
+        printf "  ${grn}${bld}✔ ${_cmd_icons[$role_num]} ${_cmd_tools[$role_num]} 역할 변경:${rst} ${ylw}${role_name}${rst}\n"
+      fi
+      ;;
+    /roles)
+      if [[ "$mode" != "collaborative" ]]; then
+        printf "  ${red}협동 모드에서만 사용 가능합니다${rst}\n"
+      else
+        printf "\n  ${grn}${bld}📋 현재 역할 배정:${rst}\n"
+        for ((ri=1; ri<=${#_cmd_tools[@]}; ri++)); do
+          printf "   ${ylw}%d)${rst} ${_cmd_icons[$ri]} ${_cmd_tools[$ri]}: ${ylw}${_cmd_roles[$ri]}${rst}\n" "$ri"
+        done
+        printf "\n"
+      fi
+      ;;
+    /swap\ *)
+      local swap_args="${input#/swap }"
+      local swap_a="${swap_args%% *}"
+      local swap_b="${swap_args##* }"
+      _do_swap "$swap_a" "$swap_b"
+      ;;
+    /order\ *)
+      local order_args="${input#/order }"
+      _do_reorder ${=order_args}
+      ;;
     /mode\ *)
       local new_mode="${input#/mode }"
-      printf "\n  ${ylw}${bld}모드를 변경하려면 세션을 재시작하세요:${rst}\n"
-      printf "  ${dm}  yolo battle -${new_mode[1]} \"프롬프트\"${rst}\n"
-      printf "  ${dm}  -p: parallel  -s: sequential  -c: collaborative${rst}\n\n"
+      _do_mode_switch "$new_mode"
       ;;
     /help)
-      printf "\n  ${ylw}/status${rst}  상태  ${ylw}/save${rst}  저장  ${ylw}/next${rst}  다음  ${ylw}/prompt X${rst}  변경\n"
-      printf "  ${ylw}/focus N${rst} 포커스  ${ylw}/skip${rst}  건너뛰기  ${ylw}/mode X${rst}  모드  ${ylw}/quit${rst}  종료\n\n"
+      printf "\n  ${ylw}/status${rst}  상태  ${ylw}/diff${rst}  변경사항  ${ylw}/save${rst}  저장\n"
+      printf "  ${ylw}/next${rst}  다음  ${ylw}/skip${rst}  건너뛰기  ${ylw}/prompt X${rst}  변경\n"
+      printf "  ${ylw}/focus N${rst} 포커스  ${ylw}/quit${rst}  종료\n"
+      printf "  ${ylw}/mode p${rst}  동시  ${ylw}/mode s${rst}  순차  ${ylw}/mode c${rst}  협동\n"
+      printf "  ${ylw}/swap N M${rst} 역할교체  ${ylw}/order N..${rst} 순서변경\n"
+      printf "  ${ylw}/role N X${rst} 역할변경  ${ylw}/roles${rst}  역할확인\n"
+      printf "  ${dm}↑/↓ 화살표: 이전 입력 / 지우기${rst}\n\n"
+      ;;
+    /*)
+      # unrecognized / command - do NOT forward to AI
+      printf "  ${red}알 수 없는 명령어: ${input}${rst}  ${dm}/help 참고${rst}\n"
       ;;
     "")
       ;;
@@ -519,15 +901,15 @@ while true; do
         if [ $cur -ge 1 ] && [ $cur -le ${#_cmd_seq_order[@]} ]; then
           local cur_tool_idx=${_cmd_seq_order[$cur]}
           local target_pane="${ai_panes[$cur_tool_idx]}"
-          tmux send-keys -t "${session}:0.${target_pane}" "$input" Enter 2>/dev/null
+          _send_to_pane "${target_pane}" "${_cmd_tools[$cur_tool_idx]}" "$input"
           printf "  ${dm}→ ${_cmd_icons[$cur_tool_idx]} ${_cmd_tools[$cur_tool_idx]}에 전송됨${rst}\n"
         else
           printf "  ${red}현재 활성 AI가 없습니다${rst}\n"
         fi
       else
         # parallel & collaborative: broadcast to all
-        for p in "${ai_panes[@]}"; do
-          tmux send-keys -t "${session}:0.${p}" "$input" Enter 2>/dev/null
+        for ((pi=1; pi<=${#ai_panes[@]}; pi++)); do
+          _send_to_pane "${ai_panes[$pi]}" "${_cmd_tools[$pi]}" "$input"
         done
         printf "  ${dm}→ ${#ai_panes[@]}개 AI에 전송됨${rst}\n"
       fi
@@ -538,8 +920,40 @@ CMD_BODY
   } > "$cmd_script"
   chmod +x "$cmd_script"
 
+  # ── layout selection for 3+ tools ──
+  local _layout_choice="top3"
+  if [ $cnt -ge 3 ] && [ -t 0 ]; then
+    printf "\n"
+    printf "  ${cyan}${bold}📐 레이아웃 선택${reset}\n"
+    printf "  ${dim}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${reset}\n"
+    printf "   ${white}${bold}1)${reset} 위 3개 + 아래 커맨드\n"
+    printf "      ${dim}┌──────┬──────┬──────┐${reset}\n"
+    printf "      ${dim}│ AI 1 │ AI 2 │ AI 3 │${reset}\n"
+    printf "      ${dim}├──────┴──────┴──────┤${reset}\n"
+    printf "      ${dim}│    ⌨️  COMMAND      │${reset}\n"
+    printf "      ${dim}└────────────────────┘${reset}\n"
+    printf "   ${white}${bold}2)${reset} 타일 (2x2 그리드)\n"
+    printf "      ${dim}┌──────┬──────┐${reset}\n"
+    printf "      ${dim}│ AI 1 │ AI 2 │${reset}\n"
+    printf "      ${dim}├──────┼──────┤${reset}\n"
+    printf "      ${dim}│ AI 3 │ CMD  │${reset}\n"
+    printf "      ${dim}└──────┴──────┘${reset}\n"
+    printf "  ${dim}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${reset}\n"
+    printf "  ${yellow}선택${reset} [${dim}기본: 1${reset}]: "
+    local _layout_input
+    read -r _layout_input
+    case "$_layout_input" in
+      2) _layout_choice="tiled" ;;
+      *) _layout_choice="top3" ;;
+    esac
+    printf "\n"
+  fi
+
   # ── create tmux session ──
+  # Use stable pane IDs (%N) instead of positional indices to avoid renumbering bugs
   tmux kill-session -t "$session" 2>/dev/null
+  local -a _ai_pane_ids
+  local _cmd_pane_id
 
   if [ $cnt -eq 2 ]; then
     # ┌──────────┬──────────┐
@@ -548,52 +962,80 @@ CMD_BODY
     # │     ⌨️ COMMAND       │
     # └─────────────────────┘
     tmux new-session -d -s "$session" "zsh ${_battle_scripts[1]}"
-    tmux split-window -v -t "${session}:0.0" -p 30 "zsh ${cmd_script}"
-    tmux split-window -h -t "${session}:0.0" -p 50 "zsh ${_battle_scripts[2]}"
-    echo "0 2" > "$tmpdir/ai_panes.txt"
-    tmux select-pane -t "${session}:0.0" -T "${_yolo_icons[1]} ${(U)_yolo_opts[1]}"
-    tmux select-pane -t "${session}:0.1" -T "⌨️  COMMAND CENTER"
-    tmux select-pane -t "${session}:0.2" -T "${_yolo_icons[2]} ${(U)_yolo_opts[2]}"
+    _ai_pane_ids[1]=$(tmux display-message -t "${session}" -p '#{pane_id}')
+    tmux split-window -v -t "${_ai_pane_ids[1]}" -p 30 "zsh ${cmd_script}"
+    _cmd_pane_id=$(tmux display-message -t "${session}" -p '#{pane_id}')
+    tmux split-window -h -t "${_ai_pane_ids[1]}" -p 50 "zsh ${_battle_scripts[2]}"
+    _ai_pane_ids[2]=$(tmux display-message -t "${session}" -p '#{pane_id}')
+    echo "${_ai_pane_ids[1]} ${_ai_pane_ids[2]}" > "$tmpdir/ai_panes.txt"
+    tmux select-pane -t "${_ai_pane_ids[1]}" -T "${_yolo_icons[1]} ${(U)_yolo_opts[1]}"
+    tmux select-pane -t "${_ai_pane_ids[2]}" -T "${_yolo_icons[2]} ${(U)_yolo_opts[2]}"
+    tmux select-pane -t "${_cmd_pane_id}" -T "⌨️  COMMAND CENTER"
   elif [ $cnt -ge 3 ]; then
-    # ┌──────────┬──────────┐
-    # │  tool1   │  tool2   │
-    # ├──────────┬──────────┤
-    # │  tool3   │ ⌨️ CMD   │
-    # └──────────┴──────────┘
-    tmux new-session -d -s "$session" "zsh ${_battle_scripts[1]}"
-    tmux split-window -v -t "${session}:0.0" -p 40 "zsh ${_battle_scripts[3]}"
-    tmux split-window -h -t "${session}:0.0" -p 50 "zsh ${_battle_scripts[2]}"
-    tmux split-window -h -t "${session}:0.1" -p 50 "zsh ${cmd_script}"
-    echo "0 2 1" > "$tmpdir/ai_panes.txt"
-    tmux select-pane -t "${session}:0.0" -T "${_yolo_icons[1]} ${(U)_yolo_opts[1]}"
-    tmux select-pane -t "${session}:0.1" -T "${_yolo_icons[3]} ${(U)_yolo_opts[3]}"
-    tmux select-pane -t "${session}:0.2" -T "${_yolo_icons[2]} ${(U)_yolo_opts[2]}"
-    tmux select-pane -t "${session}:0.3" -T "⌨️  COMMAND CENTER"
+    if [[ "$_layout_choice" == "top3" ]]; then
+      # ┌──────┬──────┬──────┐
+      # │tool1 │tool2 │tool3 │
+      # ├──────┴──────┴──────┤
+      # │    ⌨️ COMMAND       │
+      # └────────────────────┘
+      tmux new-session -d -s "$session" "zsh ${_battle_scripts[1]}"
+      _ai_pane_ids[1]=$(tmux display-message -t "${session}" -p '#{pane_id}')
+      tmux split-window -v -t "${_ai_pane_ids[1]}" -p 30 "zsh ${cmd_script}"
+      _cmd_pane_id=$(tmux display-message -t "${session}" -p '#{pane_id}')
+      tmux split-window -h -t "${_ai_pane_ids[1]}" -p 67 "zsh ${_battle_scripts[2]}"
+      _ai_pane_ids[2]=$(tmux display-message -t "${session}" -p '#{pane_id}')
+      tmux split-window -h -t "${_ai_pane_ids[2]}" -p 50 "zsh ${_battle_scripts[3]}"
+      _ai_pane_ids[3]=$(tmux display-message -t "${session}" -p '#{pane_id}')
+    else
+      # ┌──────────┬──────────┐
+      # │  tool1   │  tool2   │
+      # ├──────────┼──────────┤
+      # │  tool3   │ ⌨️ CMD   │
+      # └──────────┴──────────┘
+      tmux new-session -d -s "$session" "zsh ${_battle_scripts[1]}"
+      _ai_pane_ids[1]=$(tmux display-message -t "${session}" -p '#{pane_id}')
+      tmux split-window -h -t "${_ai_pane_ids[1]}" -p 50 "zsh ${_battle_scripts[2]}"
+      _ai_pane_ids[2]=$(tmux display-message -t "${session}" -p '#{pane_id}')
+      tmux split-window -v -t "${_ai_pane_ids[1]}" -p 50 "zsh ${_battle_scripts[3]}"
+      _ai_pane_ids[3]=$(tmux display-message -t "${session}" -p '#{pane_id}')
+      tmux split-window -v -t "${_ai_pane_ids[2]}" -p 50 "zsh ${cmd_script}"
+      _cmd_pane_id=$(tmux display-message -t "${session}" -p '#{pane_id}')
+    fi
+    echo "${_ai_pane_ids[1]} ${_ai_pane_ids[2]} ${_ai_pane_ids[3]}" > "$tmpdir/ai_panes.txt"
+    tmux select-pane -t "${_ai_pane_ids[1]}" -T "${_yolo_icons[1]} ${(U)_yolo_opts[1]}"
+    tmux select-pane -t "${_ai_pane_ids[2]}" -T "${_yolo_icons[2]} ${(U)_yolo_opts[2]}"
+    tmux select-pane -t "${_ai_pane_ids[3]}" -T "${_yolo_icons[3]} ${(U)_yolo_opts[3]}"
+    tmux select-pane -t "${_cmd_pane_id}" -T "⌨️  COMMAND CENTER"
   fi
 
   # collaborative mode: add role to pane titles
   if [[ "$mode" == "collaborative" ]]; then
-    if [ $cnt -eq 2 ]; then
-      tmux select-pane -t "${session}:0.0" -T "${_yolo_icons[1]} ${(U)_yolo_opts[1]} (${_roles[1]})"
-      tmux select-pane -t "${session}:0.2" -T "${_yolo_icons[2]} ${(U)_yolo_opts[2]} (${_roles[2]})"
-    elif [ $cnt -ge 3 ]; then
-      tmux select-pane -t "${session}:0.0" -T "${_yolo_icons[1]} ${(U)_yolo_opts[1]} (${_roles[1]})"
-      tmux select-pane -t "${session}:0.1" -T "${_yolo_icons[3]} ${(U)_yolo_opts[3]} (${_roles[3]})"
-      tmux select-pane -t "${session}:0.2" -T "${_yolo_icons[2]} ${(U)_yolo_opts[2]} (${_roles[2]})"
-    fi
+    for ((j=1; j<=$cnt; j++)); do
+      tmux select-pane -t "${_ai_pane_ids[$j]}" -T "${_yolo_icons[$j]} ${(U)_yolo_opts[$j]} (${_roles[$j]})"
+    done
   fi
 
   # sequential mode: add order numbers to pane titles
   if [[ "$mode" == "sequential" ]]; then
-    if [ $cnt -eq 2 ]; then
-      tmux select-pane -t "${session}:0.0" -T "#1 ${_yolo_icons[1]} ${(U)_yolo_opts[1]}"
-      tmux select-pane -t "${session}:0.2" -T "#2 ${_yolo_icons[2]} ${(U)_yolo_opts[2]}"
-    elif [ $cnt -ge 3 ]; then
-      tmux select-pane -t "${session}:0.0" -T "#1 ${_yolo_icons[1]} ${(U)_yolo_opts[1]}"
-      tmux select-pane -t "${session}:0.1" -T "#3 ${_yolo_icons[3]} ${(U)_yolo_opts[3]}"
-      tmux select-pane -t "${session}:0.2" -T "#2 ${_yolo_icons[2]} ${(U)_yolo_opts[2]}"
-    fi
+    for ((j=1; j<=$cnt; j++)); do
+      tmux select-pane -t "${_ai_pane_ids[$j]}" -T "#${j} ${_yolo_icons[$j]} ${(U)_yolo_opts[$j]}"
+    done
   fi
+
+  # ── mouse support ──
+  tmux set-option -t "$session" mouse on 2>/dev/null
+
+  # ── layout protection ──
+  # Prevent AI TUIs (claude, gemini, codex) from resizing panes
+  tmux set-option -t "$session" aggressive-resize on 2>/dev/null
+  # Disable passthrough escape sequences that could trigger resize
+  tmux set-option -t "$session" allow-passthrough off 2>/dev/null
+  # Lock pane sizes: ignore resize requests from applications inside panes
+  for _pid in "${_ai_pane_ids[@]}" "$_cmd_pane_id"; do
+    tmux set-option -p -t "$_pid" remain-on-exit on 2>/dev/null
+  done
+  # Set fixed layout after all panes are created
+  tmux select-layout -t "${session}:0" -E 2>/dev/null
 
   # ── pane border styling ──
   tmux set-option -t "$session" pane-border-status top 2>/dev/null
@@ -711,11 +1153,7 @@ MONITOR_BODY
   local monitor_pid=$!
 
   # focus on command center
-  if [ $cnt -eq 2 ]; then
-    tmux select-pane -t "${session}:0.1"
-  elif [ $cnt -ge 3 ]; then
-    tmux select-pane -t "${session}:0.3"
-  fi
+  tmux select-pane -t "${_cmd_pane_id}"
 
   tmux attach -t "$session"
 
