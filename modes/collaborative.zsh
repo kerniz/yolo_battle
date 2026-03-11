@@ -25,8 +25,11 @@ _mode_setup_context() {
 }
 
 # ── available roles ──
-_mode_available_roles=("Core" "Tests" "Config" "Review" "Docs" "Frontend" "Backend" "DB" "Security" "Refactor" "API" "Perf" "A11y" "i18n" "Migration" "Debug" "Architect")
+_mode_available_roles=("Lead Dev" "Reviewer" "Test/Ops" "Core" "Tests" "Config" "Review" "Docs" "Frontend" "Backend" "DB" "Security" "Refactor" "API" "Perf" "A11y" "i18n" "Migration" "Debug" "Architect")
 _mode_available_role_descs=(
+  "아키텍처+핵심 로직 구현"
+  "품질/보안/성능 통합 리뷰"
+  "테스트+빌드/배포 통합"
   "핵심 구현/소스코드 개발"
   "테스트 작성 및 검증"
   "빌드/CI·CD/인프라 설정"
@@ -45,15 +48,18 @@ _mode_available_role_descs=(
   "버그 원인 분석/디버깅"
   "아키텍처 설계/구조 결정"
 )
-_mode_available_role_icons=("⚙️" "🧪" "🔧" "👀" "📝" "🎨" "🖥️" "🗄️" "🔒" "♻️" "🔌" "⚡" "♿" "🌐" "📦" "🐛" "🏛️")
+_mode_available_role_icons=("👑" "🔍" "🛠️" "⚙️" "🧪" "🔧" "👀" "📝" "🎨" "🖥️" "🗄️" "🔒" "♻️" "🔌" "⚡" "♿" "🌐" "📦" "🐛" "🏛️")
 
 # default roles (overridden by interactive selection)
-_mode_roles=("Core" "Tests" "Config")
+_mode_roles=("Lead Dev" "Reviewer" "Test/Ops")
 
 _mode_role_prompt_for() {
   local role="$1" tmpdir="$2" prompt="$3"
-  local board_msg="After completing work, write a summary of what you did to the shared board: ${tmpdir}/shared.md (append, don't overwrite). Check the shared board to see what other AIs are doing to avoid duplication."
+  local board_msg="Check the shared board (${tmpdir}/shared.md) regularly to understand the project's direction and align your work with others. After each significant implementation or update, append a clear summary of your changes to the shared board."
   case "$role" in
+    "Lead Dev") echo "You are the Lead Developer. Your goal is to design the overall architecture and implement the CORE logic of the project. Focus on modularity, readability, and clean code. ${board_msg} Task: ${prompt}" ;;
+    "Reviewer") echo "You are the Quality & Security Reviewer. Your goal is to ensure high code quality, security, and performance. Analyze the existing codebase and other AIs' work to identify bugs, security vulnerabilities, and performance bottlenecks. Propose and implement refactoring and optimizations. ${board_msg} Task: ${prompt}" ;;
+    "Test/Ops") echo "You are the Test & Ops Engineer. Your goal is to ensure 100% test coverage and a smooth deployment process. Write comprehensive unit/integration tests and handle build configurations, CI/CD pipelines, and documentation (README, API docs). ${board_msg} Task: ${prompt}" ;;
     Core)      echo "You are the core developer. Focus ONLY on main implementation/source code. Do NOT create or modify test files, config files, or documentation. ${board_msg} Task: ${prompt}" ;;
     Tests)     echo "You are the test engineer. Write tests and test utilities ONLY. Do NOT modify any implementation/source code. Only create/edit files in test directories or files with test/spec in their name. ${board_msg} Task: ${prompt}" ;;
     Config)    echo "You are the DevOps/config engineer. Handle ONLY build config, CI/CD, and infrastructure files. Do NOT modify implementation code or test files. ${board_msg} Task: ${prompt}" ;;
