@@ -313,6 +313,12 @@ _yolo_battle() {
   # ── role definitions (from mode skill) ──
   local -a _roles _role_prompts
   _roles=("${_mode_roles[@]}")
+  
+  # Ensure arrays are truly empty if no roles are defined in mode skill
+  if [ ${#_mode_roles[@]} -eq 0 ]; then
+    _roles=()
+    _role_prompts=()
+  fi
 
   # ── collaborative mode: interactive role selection ──
   if [[ "$mode" == "collaborative" ]] && [ -t 0 ] && ! $_is_restart && [ ${#_mode_available_roles[@]} -gt 0 ]; then
@@ -1369,6 +1375,73 @@ _auto_get_mtime() {
   stat -f %m "$tmpdir"/context*.md 2>/dev/null | sort -rn | head -1
 }
 
+_auto_try_capture_pane() {
+  local settle="$1"
+  [[ "$mode" != "sequential" ]] && return 1
+
+  local cur=$(cat "$tmpdir/seq_turn.txt" 2>/dev/null)
+  [ -z "$cur" ] && return 1
+  local round=$(cat "$tmpdir/round.txt" 2>/dev/null)
+  [ -z "$round" ] && round=1
+
+  local cur_tool_idx=${_cmd_seq_order[$cur]}
+  [ -z "$cur_tool_idx" ] && return 1
+  local cur_pane="${ai_panes[$cur_tool_idx]}"
+  local cur_tool="${_cmd_tools[$cur_tool_idx]}"
+  local log_flag="$tmpdir/logged_R${round}_T${cur}.txt"
+  [ -f "$log_flag" ] && return 1
+
+  local pane_out=$(tmux capture-pane -t "${cur_pane}" -p -S -50 2>/dev/null | sed '/^[[:space:]]*$/d' | tail -n 50)
+  [ -z "$pane_out" ] && return 1
+
+  local hash=$(printf '%s' "$pane_out" | shasum -a 256 | awk '{print $1}')
+  local hash_file="$tmpdir/panehash_R${round}_T${cur}.txt"
+  if [ ! -f "$hash_file" ]; then
+    printf '%s' "$hash" > "$hash_file"
+    return 1
+  fi
+
+  local last_hash=$(cat "$hash_file" 2>/dev/null)
+  if [ -n "$last_hash" ] && [ "$hash" = "$last_hash" ]; then
+    return 1
+  fi
+
+  printf "\r  ${dm}⏳ pane 변경 감지 — settle 대기 ${settle}s ...${rst}"
+  local i="$settle"
+  while (( i > 0 )); do
+    printf "\r  ${dm}⏳ pane 변경 감지 — settle 대기 ${i}s ...${rst}  "
+    sleep 1
+    (( i-- ))
+  done
+  printf "\r%*s\r" 60 ""
+
+  local pane_out2=$(tmux capture-pane -t "${cur_pane}" -p -S -50 2>/dev/null | sed '/^[[:space:]]*$/d' | tail -n 50)
+  local hash2=$(printf '%s' "$pane_out2" | shasum -a 256 | awk '{print $1}')
+  printf '%s' "$hash2" > "$hash_file"
+
+  if [ -n "$hash2" ] && [ "$hash2" = "$hash" ]; then
+    local changed_files=$(git diff HEAD~1..HEAD --name-only 2>/dev/null)
+    {
+      echo ""
+      echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      echo "📍 ROUND ${round} | TURN ${cur} | AGENT: ${cur_tool} (AUTO LOG)"
+      echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      [ -n "$changed_files" ] && echo "📂 Modified Files:" && echo "$changed_files" | sed 's/^/- /' && echo ""
+      echo "💬 Last Output:"
+      echo '```'
+      echo "$pane_out2" | perl -pe 's/\x1b\[[0-9;]*[mGKH]//g' 2>/dev/null || echo "$pane_out2"
+      echo '```'
+      echo ""
+    } >> "$tmpdir/context.md"
+    touch "$log_flag"
+    printf "\n  ${cyn}${bld}🔄 pane 변경 감지 → /next 자동 실행${rst}\n"
+    _do_next
+    return 0
+  fi
+
+  return 1
+}
+
 _auto_start() {
   local settle="${1:-30}"
   _auto_stop 2>/dev/null
@@ -1398,6 +1471,8 @@ _auto_start() {
         else
           last_mtime="$settled_mtime"
         fi
+      else
+        _auto_try_capture_pane "$settle" >/dev/null 2>&1 || true
       fi
     done
   ) &
