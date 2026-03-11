@@ -1333,7 +1333,7 @@ trap 'COLUMNS=$(tmux display-message -p "#{pane_width}" 2>/dev/null || tput cols
 
 # ── command history + arrow key widgets ──
 typeset -a _cmd_history
-_last_user_cmd=""
+_last_user_cmd="$prompt"
 _cmd_hist_idx=0
 
 _cmd_hist_up() {
