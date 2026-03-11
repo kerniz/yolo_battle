@@ -894,12 +894,20 @@ _send_to_pane() {
   local text="$3"
   # Use -l for literal string (better for multibyte)
   tmux send-keys -t "${pane}" -l "$text" 2>/dev/null
+  # Wait for input buffer to flush before pressing Enter
+  sleep 0.3
   case "$tool" in
     gemini)
-      tmux send-keys -t "${pane}" Enter Enter Enter 2>/dev/null
+      tmux send-keys -t "${pane}" Enter 2>/dev/null
+      sleep 0.2
+      tmux send-keys -t "${pane}" Enter 2>/dev/null
+      sleep 0.2
+      tmux send-keys -t "${pane}" Enter 2>/dev/null
       ;;
     codex)
-      tmux send-keys -t "${pane}" Enter Enter 2>/dev/null
+      tmux send-keys -t "${pane}" Enter 2>/dev/null
+      sleep 0.2
+      tmux send-keys -t "${pane}" Enter 2>/dev/null
       ;;
     *)
       tmux send-keys -t "${pane}" Enter 2>/dev/null
