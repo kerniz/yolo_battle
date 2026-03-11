@@ -262,9 +262,13 @@ _yolo_battle() {
   local savedir="$HOME/yolo-results/$(date +%Y%m%d-%H%M%S)"
   local workdir="$(pwd)"
 
-  # set default guideline when no prompt given
+  # set default guideline when no prompt given (mode-specific)
   if [ -z "$prompt" ]; then
-    prompt="사용자의 지시를 대기하세요. 스스로 판단해서 코드를 수정하거나 파일을 변경하지 마세요. 공유 컨텍스트 파일에 사용자 지시가 있으면 그것을 따르고, 아무것도 없으면 사용자가 구체적인 작업을 요청할 때까지 대기하세요."
+    if typeset -f _mode_default_prompt > /dev/null 2>&1; then
+      prompt="$(_mode_default_prompt)"
+    else
+      prompt="사용자의 지시를 대기하세요. 스스로 판단해서 코드를 수정하거나 파일을 변경하지 마세요."
+    fi
   fi
   printf '%s' "$prompt" > "$tmpdir/prompt.txt"
   printf '%s' "$mode" > "$tmpdir/mode.txt"

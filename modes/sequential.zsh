@@ -16,6 +16,11 @@ _mode_setup_context() {
   echo "" >> "$tmpdir/context.md"
 }
 
+# ── default prompt (no user prompt given) ──
+_mode_default_prompt() {
+  echo "순차(릴레이) 모드입니다. 공유 컨텍스트 파일에서 이전 AI의 작업 내용을 확인하고, 사용자의 지시에 따라 작업을 이어가세요. 작업 결과와 다음 AI에게 전달할 내용을 공유 컨텍스트 파일(context.md)에 기록하세요. 사용자 지시가 없으면 대기하세요."
+}
+
 # ── roles (none for sequential) ──
 _mode_setup_roles() { : }
 _mode_roles=()

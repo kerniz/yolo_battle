@@ -24,6 +24,11 @@ _mode_setup_context() {
   echo "" >> "$tmpdir/shared.md"
 }
 
+# ── default prompt (no user prompt given) ──
+_mode_default_prompt() {
+  echo "협동 모드입니다. 배정된 역할에 맞게 작업하세요. 작업 내용은 자신의 컨텍스트 파일(context_{자신의이름}.md)에 기록하고, 다른 AI와 공유할 내용은 공유 보드(shared.md)에 남기세요. 공유 보드를 정기적으로 확인하여 팀 작업 방향을 맞추세요. 사용자 지시가 없으면 대기하세요."
+}
+
 # ── available roles ──
 _mode_available_roles=("Lead Dev" "Reviewer" "Test/Ops" "Core" "Tests" "Config" "Review" "Docs" "Frontend" "Backend" "DB" "Security" "Refactor" "API" "Perf" "A11y" "i18n" "Migration" "Debug" "Architect")
 _mode_available_role_descs=(

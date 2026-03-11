@@ -20,6 +20,11 @@ _mode_setup_context() {
   done
 }
 
+# ── default prompt (no user prompt given) ──
+_mode_default_prompt() {
+  echo "동시(병렬) 모드입니다. 각자 독립적으로 작업하며, 작업 결과를 반드시 자신의 컨텍스트 파일(context_{자신의이름}.md)에 기록하세요. 다른 AI의 컨텍스트(context_*.md)도 열람 가능합니다. 사용자 지시가 없으면 대기하세요."
+}
+
 # ── roles (none for parallel) ──
 _mode_setup_roles() { : }
 _mode_roles=()
