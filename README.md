@@ -156,6 +156,33 @@ rm -rf ~/.yolo
 # Remove the source line from ~/.zshrc
 ```
 
+## CLI Reference
+
+See `docs/CLI.md` for the full command and mode reference.
+
+## Development
+
+### Tests
+
+Install dependencies:
+
+```bash
+brew install bats-core          # macOS
+sudo apt-get install bats       # Ubuntu/Debian
+```
+
+Run tests:
+
+```bash
+make test
+```
+
+### Lint
+
+```bash
+make lint
+```
+
 ## License
 
 MIT

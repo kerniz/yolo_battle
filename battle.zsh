@@ -261,6 +261,14 @@ _yolo_battle() {
   tmpdir=$(mktemp -d /tmp/yolo-battle-XXXXXX)
   local savedir="$HOME/yolo-results/$(date +%Y%m%d-%H%M%S)"
   local workdir="$(pwd)"
+  local _coop_use_worktree=true
+
+  if [[ "$mode" == "collaborative" ]]; then
+    if ! git -C "$workdir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+      _coop_use_worktree=false
+      printf "${yellow}${bold}  ⚠ Git repo not detected. Co-op will run in a shared workdir (no worktree isolation).${reset}\n"
+    fi
+  fi
 
   # set default guideline when no prompt given (mode-specific)
   if [ -z "$prompt" ]; then
@@ -305,7 +313,10 @@ _yolo_battle() {
   rm -f "$tmpdir"/status_*(N) "$tmpdir"/diff_*(N)
   # cleanup previous worktrees on restart
   for _wt in "$tmpdir"/work_*(N); do
-    [ -d "$_wt" ] && git -C "$workdir" worktree remove "$_wt" 2>/dev/null
+    if [ -d "$_wt" ]; then
+      git -C "$workdir" worktree remove "$_wt" 2>/dev/null
+      [ -L "$_wt" ] && rm -f "$_wt"
+    fi
   done
   for _br in $(git -C "$workdir" branch --list "battle-coop-*" 2>/dev/null); do
     git -C "$workdir" branch -D "$_br" 2>/dev/null
@@ -497,14 +508,21 @@ _yolo_battle() {
 
     # co-op mode: create git worktree for file isolation (no simultaneous writes)
     if [[ "$mode" == "collaborative" ]]; then
-      # Cleanup existing branch if any to avoid conflicts (Technical Relay from Claude)
-      git -C "$workdir" branch -D "battle-coop-${tname}" 2>/dev/null
-      git -C "$workdir" worktree prune 2>/dev/null
-      
-      git -C "$workdir" worktree add -f -q "$toolworkdir" -b "battle-coop-${tname}" HEAD 2>/dev/null || {
-        printf "${yellow}  ⚠ worktree failed for ${tname}, using shared dir${reset}\n"
-        mkdir -p "$toolworkdir"
-      }
+      if $_coop_use_worktree; then
+        # Cleanup existing branch if any to avoid conflicts (Technical Relay from Claude)
+        git -C "$workdir" branch -D "battle-coop-${tname}" 2>/dev/null
+        git -C "$workdir" worktree prune 2>/dev/null
+
+        if ! git -C "$workdir" worktree add -f -q "$toolworkdir" -b "battle-coop-${tname}" HEAD 2>/dev/null; then
+          printf "${yellow}  ⚠ worktree failed for ${tname}, using shared dir${reset}\n"
+          _coop_use_worktree=false
+        fi
+      fi
+
+      if ! $_coop_use_worktree; then
+        rm -rf "$toolworkdir" 2>/dev/null
+        ln -s "$workdir" "$toolworkdir"
+      fi
     else
       mkdir -p "$toolworkdir"
     fi
@@ -1973,7 +1991,10 @@ MONITOR_BODY
 
   # cleanup co-op worktrees (if not already merged)
   for _wt in "$tmpdir"/work_*(N); do
-    [ -d "$_wt" ] && git -C "$workdir" worktree remove "$_wt" 2>/dev/null
+    if [ -d "$_wt" ]; then
+      git -C "$workdir" worktree remove "$_wt" 2>/dev/null
+      [ -L "$_wt" ] && rm -f "$_wt"
+    fi
   done
 
   # check for mode restart request
