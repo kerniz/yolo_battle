@@ -1006,7 +1006,7 @@ _do_next() {
 
   printf "  ${cyn}${bld}▶ R${round}:T${next} ${_cmd_icons[$next_tool_idx]} ${next_tool} 활성화${rst}\n"
 
-  # build auto-type message with context path
+  # build relay message with context path
   local ctx_msg=""
   if [ -n "$new_prompt" ]; then
     ctx_msg="반드시 ${tmpdir}/context.md 를 열어 최신 입력을 확인한 뒤 즉시 응답하세요(추가 질문 금지). 새 작업: ${new_prompt}"
@@ -1018,9 +1018,9 @@ _do_next() {
     ctx_msg="반드시 ${tmpdir}/context.md 를 열어 최신 입력을 확인한 뒤 즉시 응답하세요(추가 질문 금지). 이어서 작업: ${last_cmd}"
   fi
 
-  # auto-type into next AI pane via send-keys
-  _send_to_pane "${next_pane}" "${next_tool}" "$ctx_msg"
-  printf "  ${dm}→ ${_cmd_icons[$next_tool_idx]} ${next_tool}에 자동 전송됨${rst}\n"
+  # update prompt.txt BEFORE advancing turn so run script picks up relay message
+  printf '%s' "$ctx_msg" > "$tmpdir/prompt.txt"
+  printf "  ${dm}→ ${_cmd_icons[$next_tool_idx]} ${next_tool} 프롬프트 갱신됨${rst}\n"
 }
 
 # ════════════════════════════════════════
