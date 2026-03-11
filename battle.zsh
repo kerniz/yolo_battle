@@ -271,6 +271,7 @@ _yolo_battle() {
     fi
   fi
   printf '%s' "$prompt" > "$tmpdir/prompt.txt"
+  printf '%s' "$prompt" > "$tmpdir/user_cmd.txt"
   printf '%s' "$mode" > "$tmpdir/mode.txt"
   printf '%s' "$workdir" > "$tmpdir/workdir.txt"
   echo "0" > "$tmpdir/seq_turn.txt"
@@ -1015,11 +1016,13 @@ _do_next() {
   # build relay message with context path
   local ctx_msg=""
   if [ -n "$new_prompt" ]; then
+    _last_user_cmd="$new_prompt"
+    printf '%s' "$new_prompt" > "$tmpdir/user_cmd.txt"
     ctx_msg="반드시 ${tmpdir}/context.md 를 열어 최신 입력을 확인한 뒤 즉시 응답하세요(추가 질문 금지). 새 작업: ${new_prompt}"
   else
     local last_cmd="$_last_user_cmd"
     if [ -z "$last_cmd" ]; then
-      last_cmd=$(cat "$tmpdir/prompt.txt" 2>/dev/null)
+      last_cmd=$(cat "$tmpdir/user_cmd.txt" 2>/dev/null)
     fi
     ctx_msg="반드시 ${tmpdir}/context.md 를 열어 최신 입력을 확인한 뒤 즉시 응답하세요(추가 질문 금지). 이어서 작업: ${last_cmd}"
   fi
@@ -1494,6 +1497,7 @@ while true; do
     # 슬래시 명령어가 아닌 경우에만 last_user_cmd 갱신
     if [[ "$input" != /* ]]; then
       _last_user_cmd="$input"
+      printf '%s' "$input" > "$tmpdir/user_cmd.txt"
     fi
     _cmd_hist_idx=0
   fi
