@@ -1362,7 +1362,7 @@ _auto_get_mtime() {
 }
 
 _auto_start() {
-  local settle="${1:-3}"
+  local settle="${1:-30}"
   _auto_stop 2>/dev/null
   (
     local last_mtime=$(_auto_get_mtime)
@@ -1517,7 +1517,7 @@ while true; do
       elif [[ "$auto_args" =~ ^[0-9]+$ ]]; then
         _auto_start "$auto_args"
       elif [[ -z "$auto_args" ]]; then
-        _auto_start 3
+        _auto_start 30
       else
         printf "  ${dm}사용법: /auto [settle초] | /auto stop${rst}\n"
       fi
