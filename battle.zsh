@@ -1406,14 +1406,14 @@ _auto_try_capture_pane() {
     return 1
   fi
 
-  printf "\r  ${dm}⏳ pane 변경 감지 — settle 대기 ${settle}s ...${rst}"
+  printf "\033[s\033[2;1H\033[2K  ${dm}⏳ pane 변경 감지 — settle 대기 ${settle}s ...${rst}\033[u"
   local i="$settle"
   while (( i > 0 )); do
-    printf "\r  ${dm}⏳ pane 변경 감지 — settle 대기 ${i}s ...${rst}  "
+    printf "\033[s\033[2;1H\033[2K  ${dm}⏳ pane 변경 감지 — settle 대기 ${i}s ...${rst}\033[u"
     sleep 1
     (( i-- ))
   done
-  printf "\r%*s\r" 60 ""
+  printf "\033[s\033[2;1H\033[2K\033[u"
 
   local pane_out2=$(tmux capture-pane -t "${cur_pane}" -p -S -50 2>/dev/null | sed '/^[[:space:]]*$/d' | tail -n 50)
   local hash2=$(printf '%s' "$pane_out2" | shasum -a 256 | awk '{print $1}')
@@ -1514,19 +1514,19 @@ _auto_start() {
           last_pane_hash=""
           last_pane_change_ts=$(date +%s)
         elif $ctx_changed && [ -n "$last_pane_hash" ] && (( remaining > 0 )); then
-          printf "\r  ${dm}⏳ context 변경됨 — pane 안정 대기 ${remaining}s ...${rst}  "
+          printf "\033[s\033[2;1H\033[2K  ${dm}⏳ context 변경됨 — pane 안정 대기 ${remaining}s ...${rst}\033[u"
         fi
       else
         # non-sequential: context 변경 후 settle초 안정 확인
         if $ctx_changed; then
-          printf "\r  ${dm}⏳ context 변경 감지 — settle 대기 ${settle}s ...${rst}"
+          printf "\033[s\033[2;1H\033[2K  ${dm}⏳ context 변경 감지 — settle 대기 ${settle}s ...${rst}\033[u"
           local i="$settle"
           while (( i > 0 )); do
-            printf "\r  ${dm}⏳ context 변경 감지 — settle 대기 ${i}s ...${rst}  "
+            printf "\033[s\033[2;1H\033[2K  ${dm}⏳ context 변경 감지 — settle 대기 ${i}s ...${rst}\033[u"
             sleep 1
             (( i-- ))
           done
-          printf "\r%*s\r" 60 ""
+          printf "\033[s\033[2;1H\033[2K\033[u"
           local settled_mtime=$(_auto_get_mtime)
           if [[ "$settled_mtime" == "$cur_mtime" ]]; then
             printf "\n  ${cyn}${bld}🔄 context 변경 감지 → /next 자동 실행${rst}\n"
