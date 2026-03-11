@@ -1321,8 +1321,8 @@ bindkey '^H' backward-delete-char 2>/dev/null
 bindkey '\b' backward-delete-char 2>/dev/null
 
 # ensure correct terminal width for vared line wrapping
-COLUMNS=$(tput cols 2>/dev/null || echo 80)
-trap 'COLUMNS=$(tput cols 2>/dev/null || echo 80)' WINCH
+COLUMNS=$(tmux display-message -p '#{pane_width}' 2>/dev/null || tput cols 2>/dev/null || echo 80)
+trap 'COLUMNS=$(tmux display-message -p "#{pane_width}" 2>/dev/null || tput cols 2>/dev/null || echo 80)' WINCH
 
 # ── command history + arrow key widgets ──
 typeset -a _cmd_history
@@ -1448,20 +1448,21 @@ _auto_start() {
   (
     local last_mtime=$(_auto_get_mtime)
     [ -z "$last_mtime" ] && last_mtime="0"
+    local last_pane_hash=""
+    local last_pane_change_ts=$(date +%s)
 
     while true; do
       sleep 2
       local cur_mtime=$(_auto_get_mtime)
       [ -z "$cur_mtime" ] && cur_mtime="0"
 
-      # context 변경 감지
+      # context 변경 감지 (이전 /next 이후 변경 있는지)
       local ctx_changed=false
       if [[ "$cur_mtime" != "$last_mtime" ]]; then
         ctx_changed=true
       fi
 
-      # pane 변경 감지 (hash 비교)
-      local pane_changed=false
+      # pane 안정성 추적 (sequential 모드)
       if [[ "$mode" == "sequential" ]]; then
         local cur=$(cat "$tmpdir/seq_turn.txt" 2>/dev/null)
         local round=$(cat "$tmpdir/round.txt" 2>/dev/null)
@@ -1470,101 +1471,63 @@ _auto_start() {
           local cur_tool_idx=${_cmd_seq_order[$cur]}
           if [ -n "$cur_tool_idx" ]; then
             local cur_pane="${ai_panes[$cur_tool_idx]}"
-            local log_flag="$tmpdir/logged_R${round}_T${cur}.txt"
-            if [ ! -f "$log_flag" ]; then
-              local pane_out=$(tmux capture-pane -t "${cur_pane}" -p -S -50 2>/dev/null | sed '/^[[:space:]]*$/d' | tail -n 50)
-              if [ -n "$pane_out" ]; then
-                local hash=$(printf '%s' "$pane_out" | shasum -a 256 | awk '{print $1}')
-                local hash_file="$tmpdir/panehash_R${round}_T${cur}.txt"
-                if [ ! -f "$hash_file" ]; then
-                  printf '%s' "$hash" > "$hash_file"
-                else
-                  local last_hash=$(cat "$hash_file" 2>/dev/null)
-                  if [ "$hash" != "$last_hash" ]; then
-                    pane_changed=true
-                    printf '%s' "$hash" > "$hash_file"
-                  fi
-                fi
+            local pane_out=$(tmux capture-pane -t "${cur_pane}" -p -S -50 2>/dev/null | sed '/^[[:space:]]*$/d' | tail -n 50)
+            if [ -n "$pane_out" ]; then
+              local cur_hash=$(printf '%s' "$pane_out" | shasum -a 256 | awk '{print $1}')
+              if [[ "$cur_hash" != "$last_pane_hash" ]]; then
+                # pane이 변경됨 — 타이머 리셋
+                last_pane_hash="$cur_hash"
+                last_pane_change_ts=$(date +%s)
               fi
             fi
           fi
         fi
-      fi
 
-      # AND 조건: context 변경 OR pane 변경 감지 시 settle 시작
-      if $ctx_changed || $pane_changed; then
-        local reason=""
-        $ctx_changed && $pane_changed && reason="context+pane"
-        $ctx_changed && ! $pane_changed && reason="context"
-        ! $ctx_changed && $pane_changed && reason="pane"
+        # AND 조건: context 변경 + pane이 settle초 이상 안정
+        local now=$(date +%s)
+        local pane_stable_secs=$(( now - last_pane_change_ts ))
+        local remaining=$(( settle - pane_stable_secs ))
 
-        printf "\r  ${dm}⏳ ${reason} 변경 감지 — settle 대기 ${settle}s ...${rst}"
-        local i="$settle"
-        while (( i > 0 )); do
-          printf "\r  ${dm}⏳ ${reason} 변경 감지 — settle 대기 ${i}s ...${rst}  "
-          sleep 1
-          (( i-- ))
-        done
-        printf "\r%*s\r" 60 ""
-
-        # settle 후 양쪽 모두 안정화되었는지 확인
-        local settled_mtime=$(_auto_get_mtime)
-        local both_settled=false
-
-        if [[ "$mode" == "sequential" ]] && [ -n "$cur" ] && [ -n "$cur_tool_idx" ]; then
-          local pane_out2=$(tmux capture-pane -t "${cur_pane}" -p -S -50 2>/dev/null | sed '/^[[:space:]]*$/d' | tail -n 50)
-          local hash2=$(printf '%s' "$pane_out2" | shasum -a 256 | awk '{print $1}')
-          local hash_file="$tmpdir/panehash_R${round}_T${cur}.txt"
-          printf '%s' "$hash2" > "$hash_file"
-
-          # AND: context 안정화 + pane 안정화
-          local ctx_settled=false
-          local pane_settled=false
-
-          # context가 변경됐었으면 settle 확인, 아니면 통과
-          if $ctx_changed; then
-            [[ "$settled_mtime" == "$cur_mtime" ]] && ctx_settled=true
-          else
-            ctx_settled=true
+        if $ctx_changed && [ -n "$last_pane_hash" ] && (( pane_stable_secs >= settle )); then
+          # pane 결과를 context에 기록
+          local log_flag="$tmpdir/logged_R${round}_T${cur}.txt"
+          if [ ! -f "$log_flag" ]; then
+            local cur_tool="${_cmd_tools[$cur_tool_idx]}"
+            local changed_files=$(git diff HEAD~1..HEAD --name-only 2>/dev/null)
+            {
+              echo ""
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+              echo "📍 ROUND ${round} | TURN ${cur} | AGENT: ${cur_tool} (AUTO LOG)"
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+              [ -n "$changed_files" ] && echo "📂 Modified Files:" && echo "$changed_files" | sed 's/^/- /' && echo ""
+              echo "💬 Last Output:"
+              echo '```'
+              echo "$pane_out" | perl -pe 's/\x1b\[[0-9;]*[mGKH]//g' 2>/dev/null || echo "$pane_out"
+              echo '```'
+              echo ""
+            } >> "$tmpdir/context.md"
+            touch "$log_flag"
           fi
-
-          # pane이 변경됐었으면 settle 확인, 아니면 통과
-          if $pane_changed; then
-            [[ "$hash2" == "$hash" ]] && pane_settled=true
-          else
-            pane_settled=true
-          fi
-
-          $ctx_settled && $pane_settled && both_settled=true
-
-          if $both_settled; then
-            # pane 결과를 context에 기록
-            local log_flag="$tmpdir/logged_R${round}_T${cur}.txt"
-            if [ ! -f "$log_flag" ]; then
-              local cur_tool="${_cmd_tools[$cur_tool_idx]}"
-              local changed_files=$(git diff HEAD~1..HEAD --name-only 2>/dev/null)
-              {
-                echo ""
-                echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-                echo "📍 ROUND ${round} | TURN ${cur} | AGENT: ${cur_tool} (AUTO LOG)"
-                echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-                [ -n "$changed_files" ] && echo "📂 Modified Files:" && echo "$changed_files" | sed 's/^/- /' && echo ""
-                echo "💬 Last Output:"
-                echo '```'
-                echo "$pane_out2" | perl -pe 's/\x1b\[[0-9;]*[mGKH]//g' 2>/dev/null || echo "$pane_out2"
-                echo '```'
-                echo ""
-              } >> "$tmpdir/context.md"
-              touch "$log_flag"
-            fi
-            printf "\n  ${cyn}${bld}🔄 ${reason} 변경 감지 → /next 자동 실행${rst}\n"
-            _do_next
-            last_mtime=$(_auto_get_mtime)
-          else
-            last_mtime="$settled_mtime"
-          fi
-        else
-          # non-sequential: context only
+          printf "\n  ${cyn}${bld}🔄 context 변경 + pane ${pane_stable_secs}s 안정 → /next 자동 실행${rst}\n"
+          _do_next
+          last_mtime=$(_auto_get_mtime)
+          last_pane_hash=""
+          last_pane_change_ts=$(date +%s)
+        elif $ctx_changed && [ -n "$last_pane_hash" ] && (( remaining > 0 )); then
+          printf "\r  ${dm}⏳ context 변경됨 — pane 안정 대기 ${remaining}s ...${rst}  "
+        fi
+      else
+        # non-sequential: context 변경 후 settle초 안정 확인
+        if $ctx_changed; then
+          printf "\r  ${dm}⏳ context 변경 감지 — settle 대기 ${settle}s ...${rst}"
+          local i="$settle"
+          while (( i > 0 )); do
+            printf "\r  ${dm}⏳ context 변경 감지 — settle 대기 ${i}s ...${rst}  "
+            sleep 1
+            (( i-- ))
+          done
+          printf "\r%*s\r" 60 ""
+          local settled_mtime=$(_auto_get_mtime)
           if [[ "$settled_mtime" == "$cur_mtime" ]]; then
             printf "\n  ${cyn}${bld}🔄 context 변경 감지 → /next 자동 실행${rst}\n"
             _do_next
@@ -1602,6 +1565,9 @@ fi
 # ════════════════════════════════════════
 while true; do
   input=""
+  # tmux pane 실제 너비로 COLUMNS 갱신 (줄바꿈 정확도 향상)
+  local _pw=$(tmux display-message -p '#{pane_width}' 2>/dev/null)
+  [ -n "$_pw" ] && COLUMNS="$_pw" || COLUMNS=$(tput cols 2>/dev/null || echo 80)
   if vared -p "  %{${prp}${bld}%}▸%{${rst}%} " -c input 2>/dev/null; then
     printf '\033[J'
   else
