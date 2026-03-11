@@ -328,9 +328,9 @@ _yolo_battle() {
 
       # set default cursor to a sensible position
       case $_ai_idx in
-        1) _ri=0 ;;  # Core
-        2) _ri=1 ;;  # Tests
-        3) _ri=2 ;;  # Config
+        1) _ri=0 ;;  # Lead Dev
+        2) _ri=1 ;;  # Reviewer
+        3) _ri=2 ;;  # Test/Ops
         *) _ri=$(( (_ai_idx - 1) % _avail_cnt )) ;;
       esac
 

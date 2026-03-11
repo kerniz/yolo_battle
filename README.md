@@ -107,9 +107,9 @@ Role-based pipeline where each AI has a specific job:
 
 | AI | Role | Task |
 |---|---|---|
-| 🤖 Claude | Developer | Write production code |
-| ✨ Gemini | Reviewer | Code review & improvements |
-| 🧠 Codex | Tester | Write comprehensive tests |
+| 🤖 Claude | Lead Dev | Architecture & Core Logic |
+| ✨ Gemini | Reviewer | Quality, Security & Optimization |
+| 🧠 Codex | Test/Ops | Testing, CI/CD & Documentation |
 
 ## Command Center
 
