@@ -122,6 +122,8 @@ The 4th pane is your control center. Type to broadcast to all AIs (or current AI
 | `/save` | Save all outputs to `~/yolo-results/` |
 | `/prompt X` | Change prompt |
 | `/next` | Start next AI (sequential only) |
+| `/auto` | Auto `/next` on context change (sequential only) |
+| `/auto stop` | Stop auto mode |
 | `/skip` | Skip current AI (sequential only) |
 | `/focus N` | Focus on pane N |
 | `/mode X` | Show mode switch instructions |

@@ -37,7 +37,7 @@ EOF
 # ── prompt injection ──
 _mode_prompt_inject() {
   local tmpdir="$1"
-  echo 'prompt="[내 컨텍스트: '"$tmpdir"'/context_${toolname}.md | 다른 AI 컨텍스트: '"$tmpdir"'/context_*.md 열람 가능] ${prompt}"'
+  echo 'prompt="[작업 결과를 반드시 '"$tmpdir"'/context_${toolname}.md 에 기록하세요. 다른 AI 컨텍스트: '"$tmpdir"'/context_*.md 열람 가능. context.md는 사용하지 마세요.] ${prompt}"'
 }
 
 # ── done logic additions (heredoc injected into run script) ──

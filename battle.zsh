@@ -1120,6 +1120,53 @@ bindkey '^[OB' _cmd_hist_down   # Down arrow (alt escape)
 bindkey '^U'   _cmd_kill_line   # Ctrl-U to clear line
 
 # ════════════════════════════════════════
+# AUTO-NEXT
+# ════════════════════════════════════════
+_auto_pid=""
+
+_auto_get_mtime() {
+  stat -f %m "$tmpdir"/context*.md 2>/dev/null | sort -rn | head -1
+}
+
+_auto_start() {
+  local settle="${1:-3}"
+  _auto_stop 2>/dev/null
+  (
+    local last_mtime=$(_auto_get_mtime)
+    [ -z "$last_mtime" ] && last_mtime="0"
+
+    while true; do
+      sleep 2
+      local cur_mtime=$(_auto_get_mtime)
+      [ -z "$cur_mtime" ] && cur_mtime="0"
+      if [[ "$cur_mtime" != "$last_mtime" ]]; then
+        # context 변경 감지, settle 대기 후 확정
+        sleep "$settle"
+        local settled_mtime=$(_auto_get_mtime)
+        if [[ "$settled_mtime" == "$cur_mtime" ]]; then
+          printf "\n  ${cyn}${bld}🔄 context 변경 감지 → /next 자동 실행${rst}\n"
+          _do_next
+          last_mtime=$(_auto_get_mtime)  # _do_next가 context를 수정할 수 있으므로 갱신
+        else
+          last_mtime="$settled_mtime"
+        fi
+      fi
+    done
+  ) &
+  _auto_pid=$!
+  printf "  ${grn}${bld}✔ /auto 시작${rst} ${dm}(context 변경 감지 모드, settle=${settle}s)${rst}\n"
+}
+
+_auto_stop() {
+  if [ -n "$_auto_pid" ] && kill -0 "$_auto_pid" 2>/dev/null; then
+    kill "$_auto_pid" 2>/dev/null
+    wait "$_auto_pid" 2>/dev/null
+    printf "  ${ylw}⏹ /auto 중지됨${rst}\n"
+  fi
+  _auto_pid=""
+}
+
+# ════════════════════════════════════════
 # INPUT LOOP
 # ════════════════════════════════════════
 while true; do
@@ -1138,6 +1185,7 @@ while true; do
 
   case "$input" in
     /quit)
+      _auto_stop
       printf "  ${red}세션을 종료합니다...${rst}\n"
       tmux kill-session -t "$session" 2>/dev/null
       break
@@ -1191,6 +1239,19 @@ while true; do
       ;;
     /skip)
       _do_skip
+      ;;
+    /auto|/auto\ *)
+      local auto_args="${input#/auto}"
+      auto_args="${auto_args# }"
+      if [[ "$auto_args" == "stop" ]]; then
+        _auto_stop
+      elif [[ "$auto_args" =~ ^[0-9]+$ ]]; then
+        _auto_start "$auto_args"
+      elif [[ -z "$auto_args" ]]; then
+        _auto_start 3
+      else
+        printf "  ${dm}사용법: /auto [settle초] | /auto stop${rst}\n"
+      fi
       ;;
     /pick\ *)
       local pick_num="${input#/pick }"
@@ -1259,6 +1320,7 @@ while true; do
       printf "\n  ${cyn}${bld}공통:${rst}\n"
       printf "  ${ylw}/status${rst}  상태  ${ylw}/diff${rst}  변경사항  ${ylw}/save${rst}  저장\n"
       printf "  ${ylw}/ctx${rst}    컨텍스트 확인  ${ylw}/prompt X${rst} 프롬프트 변경\n"
+      printf "  ${ylw}/auto${rst}   context 변경 감지→자동 /next  ${ylw}/auto stop${rst} 중지\n"
       printf "  ${ylw}/focus N${rst} 포커스  ${ylw}/mode X${rst} 모드변경 ${dm}(p/s/c)${rst}\n"
       printf "  ${ylw}/quit${rst}   종료\n"
       
