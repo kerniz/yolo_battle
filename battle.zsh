@@ -1381,8 +1381,15 @@ _auto_start() {
       local cur_mtime=$(_auto_get_mtime)
       [ -z "$cur_mtime" ] && cur_mtime="0"
       if [[ "$cur_mtime" != "$last_mtime" ]]; then
-        # context 변경 감지, settle 대기 후 확정
-        sleep "$settle"
+        # context 변경 감지, settle 카운트다운 표시
+        printf "\r  ${dm}⏳ context 변경 감지 — settle 대기 ${settle}s ...${rst}"
+        local i="$settle"
+        while (( i > 0 )); do
+          printf "\r  ${dm}⏳ context 변경 감지 — settle 대기 ${i}s ...${rst}  "
+          sleep 1
+          (( i-- ))
+        done
+        printf "\r%*s\r" 60 ""
         local settled_mtime=$(_auto_get_mtime)
         if [[ "$settled_mtime" == "$cur_mtime" ]]; then
           printf "\n  ${cyn}${bld}🔄 context 변경 감지 → /next 자동 실행${rst}\n"
