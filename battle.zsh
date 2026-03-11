@@ -11,13 +11,109 @@ _yolo_battle() {
   #   reset, bold, dim, red, orange, yellow, green, cyan, blue, purple, pink, white (colors)
 
   # ── parse mode flag ──
-  local mode="collaborative"
+  local mode=""
   local -a _seq_order  # custom order for sequential mode
   case "$1" in
     -p|--parallel)      mode="parallel"; shift ;;
     -s|--sequential)    mode="sequential"; shift ;;
     -c|--collaborative) mode="collaborative"; shift ;;
   esac
+
+  # ── interactive mode selection if no flag given ──
+  if [ -z "$mode" ] && [ -t 0 ]; then
+    local -a _mode_names=("sequential" "parallel" "collaborative")
+    local -a _mode_labels=("순차 (Sequential)" "동시 (Parallel)" "협동 (Collaborative)")
+    local -a _mode_icons=("🔄" "⚡" "🤝")
+    local -a _mode_descs=(
+      "1개 컨텍스트 릴레이, 라운드로빈"
+      "각 AI 독립 실행, 최종 선택"
+      "역할분리 + worktree 격리"
+    )
+    local -a _mode_colors=("$cyan" "$yellow" "$green")
+    local mi=0
+    local mkey
+    local cursor_up=$'\033[A'
+    local cursor_down=$'\033[B'
+    local bg_sel=$'\033[48;5;236m'
+
+    printf "\033[?25l"
+    trap 'printf "\033[?25h"' INT
+
+    printf "\n"
+    printf "  ${purple}${bold}╔══════════════════════════════════════╗${reset}\n"
+    printf "  ${purple}${bold}║${reset}  ${yellow}${bold}⚔️  B A T T L E   M O D E ⚔️${reset}        ${purple}${bold}║${reset}\n"
+    printf "  ${purple}${bold}║${reset}  ${dim}Select battle strategy${reset}              ${purple}${bold}║${reset}\n"
+    printf "  ${purple}${bold}╠══════════════════════════════════════╣${reset}\n"
+
+    for ((mj=1; mj<=3; mj++)); do
+      if [ $((mj-1)) -eq "$mi" ]; then
+        printf "  ${purple}${bold}║${reset} ${bg_sel} ${_mode_colors[$mj]}${bold} ▸ ${_mode_icons[$mj]}  %-28s${reset}${bg_sel} ${reset}${purple}${bold}║${reset}\n" "${_mode_labels[$mj]}"
+        printf "  ${purple}${bold}║${reset} ${bg_sel}      ${dim}%-30s${reset}${bg_sel} ${reset}${purple}${bold}║${reset}\n" "${_mode_descs[$mj]}"
+      else
+        printf "  ${purple}${bold}║${reset}   ${dim}   ${_mode_icons[$mj]}  %-28s${reset}   ${purple}${bold}║${reset}\n" "${_mode_labels[$mj]}"
+        printf "  ${purple}${bold}║${reset}      ${dim}%-30s${reset}   ${purple}${bold}║${reset}\n" "${_mode_descs[$mj]}"
+      fi
+    done
+
+    printf "  ${purple}${bold}╠══════════════════════════════════════╣${reset}\n"
+    printf "  ${purple}${bold}║${reset}  ${dim}↑↓ navigate${reset}  ${dim}⏎ select${reset}             ${purple}${bold}║${reset}\n"
+    printf "  ${purple}${bold}╚══════════════════════════════════════╝${reset}\n"
+
+    while true; do
+      read -rs -k1 mkey
+      if [[ "$mkey" == $'\033' ]]; then
+        read -rs -k2 mkey
+        mkey=$'\033'"$mkey"
+      fi
+
+      case "$mkey" in
+        "$cursor_up")
+          mi=$(( (mi - 1 + 3) % 3 ))
+          ;;
+        "$cursor_down")
+          mi=$(( (mi + 1) % 3 ))
+          ;;
+        $'\n')
+          break
+          ;;
+        *)
+          continue
+          ;;
+      esac
+
+      # redraw: move up past 3 items (6 lines) + 3 footer lines = 9 lines
+      printf "\033[9A"
+      for ((mj=1; mj<=3; mj++)); do
+        if [ $((mj-1)) -eq "$mi" ]; then
+          printf "\r  ${purple}${bold}║${reset} ${bg_sel} ${_mode_colors[$mj]}${bold} ▸ ${_mode_icons[$mj]}  %-28s${reset}${bg_sel} ${reset}${purple}${bold}║${reset}\n" "${_mode_labels[$mj]}"
+          printf "\r  ${purple}${bold}║${reset} ${bg_sel}      ${dim}%-30s${reset}${bg_sel} ${reset}${purple}${bold}║${reset}\n" "${_mode_descs[$mj]}"
+        else
+          printf "\r  ${purple}${bold}║${reset}   ${dim}   ${_mode_icons[$mj]}  %-28s${reset}   ${purple}${bold}║${reset}\n" "${_mode_labels[$mj]}"
+          printf "\r  ${purple}${bold}║${reset}      ${dim}%-30s${reset}   ${purple}${bold}║${reset}\n" "${_mode_descs[$mj]}"
+        fi
+      done
+      printf "\033[3B"
+    done
+
+    mode="${_mode_names[$((mi+1))]}"
+
+    # clear selection UI and show chosen mode
+    printf "\033[13A\033[J"
+    local _sel_color="${_mode_colors[$((mi+1))]}"
+    local _sel_icon="${_mode_icons[$((mi+1))]}"
+    local _sel_label="${_mode_labels[$((mi+1))]}"
+    printf "\n"
+    printf "  ${_sel_color}${bold}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${reset}\n"
+    printf "  ${_sel_color}${bold}  ${_sel_icon}  ${white}B A T T L E${reset} ${dim}→${reset} ${_sel_color}${bold}${_sel_label}${reset}\n"
+    printf "  ${_sel_color}${bold}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${reset}\n"
+    printf "\n"
+
+    printf "\033[?25h"
+    trap - INT
+  elif [ -z "$mode" ]; then
+    mode="collaborative"
+  fi
+
   local prompt="$*"
 
   command -v tmux >/dev/null 2>&1 || {

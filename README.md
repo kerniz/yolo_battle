@@ -57,15 +57,33 @@ yolo codex
 ### Battle Mode
 
 ```bash
-yolo battle "build a REST API"          # parallel (default)
-yolo battle -p "build a REST API"       # parallel (explicit)
-yolo battle -s "build a REST API"       # sequential
-yolo battle -c "build a REST API"       # collaborative
+yolo battle "build a REST API"          # interactive mode picker (↑↓ + Enter)
+yolo battle -p "build a REST API"       # parallel (flag)
+yolo battle -s "build a REST API"       # sequential (flag)
+yolo battle -c "build a REST API"       # collaborative (flag)
+```
+
+Without a flag, an interactive mode picker appears:
+
+```
+  ╔══════════════════════════════════════╗
+  ║  ⚔️  B A T T L E   M O D E ⚔️        ║
+  ║  Select battle strategy              ║
+  ╠══════════════════════════════════════╣
+  ║  ▸ 🔄  순차 (Sequential)             ║
+  ║      1개 컨텍스트 릴레이              ║
+  ║    ⚡  동시 (Parallel)                ║
+  ║      각 AI 독립 실행, 최종 선택       ║
+  ║    🤝  협동 (Collaborative)           ║
+  ║      역할분리 + worktree 격리         ║
+  ╠══════════════════════════════════════╣
+  ║  ↑↓ navigate  ⏎ select               ║
+  ╚══════════════════════════════════════╝
 ```
 
 ## Battle Modes
 
-### ⚡ Parallel (`-p`, default)
+### ⚡ Parallel (`-p`)
 
 All AIs receive the same prompt and work simultaneously. Compare their approaches side-by-side.
 
