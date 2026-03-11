@@ -253,7 +253,11 @@ _yolo_battle() {
 
     # co-op mode: create git worktree for file isolation (no simultaneous writes)
     if [[ "$mode" == "collaborative" ]]; then
-      git -C "$workdir" worktree add -q "$toolworkdir" -b "battle-coop-${tname}" HEAD 2>/dev/null || {
+      # Cleanup existing branch if any to avoid conflicts (Technical Relay from Claude)
+      git -C "$workdir" branch -D "battle-coop-${tname}" 2>/dev/null
+      git -C "$workdir" worktree prune 2>/dev/null
+      
+      git -C "$workdir" worktree add -f -q "$toolworkdir" -b "battle-coop-${tname}" HEAD 2>/dev/null || {
         printf "${yellow}  ⚠ worktree failed for ${tname}, using shared dir${reset}\n"
         mkdir -p "$toolworkdir"
       }
@@ -426,7 +430,7 @@ DONE_END
   else
     printf "\n"
     printf "  ${purple}${bold}╔══════════════════════════════════════╗${reset}\n"
-    printf "  ${purple}${bold}║${reset}  ${red}${bold}⚔️  Y O L O   B A T T L E${reset}          ${purple}${bold}║${reset}\n"
+    printf "  ${purple}${bold}║${reset}  ${red}${bold}${blink}⚔️${reset}  ${red}${bold}Y O L O   B A T T L E${reset} ${red}${bold}${blink}⚔️${reset}        ${purple}${bold}║${reset}\n"
     printf "  ${purple}${bold}╠══════════════════════════════════════╣${reset}\n"
     printf "  ${purple}${bold}║${reset}  ${mode_color}${bold}${mode_icon} ${mode_label}${reset}%-$((21 - ${#mode_label}))s${purple}${bold}║${reset}\n" ""
     printf "  ${purple}${bold}╠══════════════════════════════════════╣${reset}\n"
@@ -595,11 +599,13 @@ _show_status() {
   printf "\n"
   local round=$(cat "$tmpdir/round.txt" 2>/dev/null)
   local cur_turn=$(cat "$tmpdir/seq_turn.txt" 2>/dev/null)
+  printf "  ${purple}${bold}┏━━━━━━━━ STATUS BOARD ━━━━━━━┓${rst}\n"
   if $_mode_needs_order; then
-    printf "  ${(P)_mode_color_name:-$white}${bld}${_mode_icon}${rst} ${dm}${_mode_label}${rst}  ${cyn}${bld}라운드 ${round} / 턴 ${cur_turn}${rst}\n"
+    printf "  ${purple}${bold}┃${rst} ${(P)_mode_color_name:-$white}${bld}${_mode_icon}${rst} ${dm}${_mode_label}${rst}  ${cyn}${bld}R${round}:T${cur_turn}${rst}%-$((16 - ${#_mode_label}))s ${purple}${bold}┃${rst}\n" ""
   else
-    printf "  ${(P)_mode_color_name:-$white}${bld}${_mode_icon}${rst} ${dm}${_mode_label}${rst}\n"
+    printf "  ${purple}${bold}┃${rst} ${(P)_mode_color_name:-$white}${bld}${_mode_icon}${rst} ${dm}${_mode_label}${rst}%-$((24 - ${#_mode_label}))s ${purple}${bold}┃${rst}\n" ""
   fi
+  printf "  ${purple}${bold}┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫${rst}\n"
   for ((si=1; si<=${#_cmd_tools[@]}; si++)); do
     local sname="${_cmd_tools[$si]}"
     local sicon="${_cmd_icons[$si]}"
@@ -607,15 +613,16 @@ _show_status() {
     if [ -f "$sfile" ]; then
       local st=$(cat "$sfile" 2>/dev/null)
       case "$st" in
-        done:*)  printf "  ${grn}${bld}✔ ${sicon} %-12s${rst} ${dm}완료 (${st#done:})${rst}\n" "$sname" ;;
-        running) printf "  ${ylw}${bld}⣾ ${sicon} %-12s${rst} ${ylw}작업중...${rst}\n" "$sname" ;;
-        waiting) printf "  ${dm}⏳ ${sicon} %-12s 대기중${rst}\n" "$sname" ;;
-        *)       printf "  ${dm}·  ${sicon} %-12s --${rst}\n" "$sname" ;;
+        done:*)  printf "  ${purple}${bold}┃${rst} ${grn}${bld}✔ ${sicon} %-12s${rst} ${dm}${st#done:}${rst}   ${purple}${bold}┃${rst}\n" "$sname" ;;
+        running) printf "  ${purple}${bold}┃${rst} ${ylw}${bld}⣾ ${sicon} %-12s${rst} ${ylw}ING..${rst}  ${purple}${bold}┃${rst}\n" "$sname" ;;
+        waiting) printf "  ${purple}${bold}┃${rst} ${dm}⏳ ${sicon} %-12s WAIT${rst}   ${purple}${bold}┃${rst}\n" "$sname" ;;
+        *)       printf "  ${purple}${bold}┃${rst} ${dm}·  ${sicon} %-12s --${rst}     ${purple}${bold}┃${rst}\n" "$sname" ;;
       esac
     else
-      printf "  ${dm}·  ${sicon} %-12s --${rst}\n" "$sname"
+      printf "  ${purple}${bold}┃${rst} ${dm}·  ${sicon} %-12s --${rst}     ${purple}${bold}┃${rst}\n" "$sname"
     fi
   done
+  printf "  ${purple}${bold}┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛${rst}\n"
   printf "\n"
 }
 
@@ -714,51 +721,6 @@ _do_next() {
   local new_prompt="$*"
   local cur=$(cat "$tmpdir/seq_turn.txt" 2>/dev/null)
 
-  # capture current AI output + diff → context.md
-  if [ -n "$cur" ] && [ "$cur" -ge 1 ]; then
-    local cur_tool_idx=${_cmd_seq_order[$(( ((cur - 1) % ${#_cmd_seq_order[@]}) + 1 ))]}
-    local cur_pane="${ai_panes[$cur_tool_idx]}"
-    local pane_content
-    pane_content=$(tmux capture-pane -t "${cur_pane}" -p -S -200 2>/dev/null)
-    local pane_meaningful
-    pane_meaningful=$(echo "$pane_content" | sed '/^[[:space:]]*$/d' | tail -n 20)
-
-    # capture git diff
-    local cur_diff=""
-    cd "$workdir"
-    local cur_head=$(git rev-parse HEAD 2>/dev/null)
-    local prev_head=$(cat "$tmpdir/git_head_track.txt" 2>/dev/null)
-    if [ -n "$prev_head" ] && [ "$prev_head" != "$cur_head" ]; then
-      cur_diff=$(git diff "$prev_head".."$cur_head" --stat 2>/dev/null)
-    fi
-    local uncommitted=$(git diff --stat 2>/dev/null)
-    [ -n "$uncommitted" ] && cur_diff="${cur_diff}\n${uncommitted}"
-    echo "$cur_head" > "$tmpdir/git_head_track.txt"
-
-    local round=$(cat "$tmpdir/round.txt" 2>/dev/null)
-    [ -z "$round" ] && round=1
-    local cur_tool_name="${_cmd_tools[$cur_tool_idx]}"
-
-    # append to shared context.md
-    {
-      echo ""
-      echo "## Round ${round} - ${cur_tool_name} (Turn ${cur})"
-      echo "### Output (last 20 lines)"
-      echo '```'
-      echo "$pane_meaningful"
-      echo '```'
-      if [ -n "$cur_diff" ]; then
-        echo "### Changes"
-        echo '```'
-        echo -e "$cur_diff"
-        echo '```'
-      fi
-      echo ""
-    } >> "$tmpdir/context.md"
-
-    printf "  ${dm}컨텍스트 저장됨 (R${round}, ${cur_tool_name})${rst}\n"
-  fi
-
   # calculate next turn (round-robin: wraps around)
   local next=$(( cur + 1 ))
   local cnt=${#_cmd_seq_order[@]}
@@ -783,10 +745,10 @@ _do_next() {
   # build auto-type message with context path
   local ctx_msg=""
   if [ -n "$new_prompt" ]; then
-    ctx_msg="이전 AI들의 작업 컨텍스트를 읽어주세요: ${tmpdir}/context.md 새 작업: ${new_prompt}"
+    ctx_msg="반드시 ${tmpdir}/context.md 를 열어 최신 입력을 확인한 뒤 즉시 응답하세요(추가 질문 금지). 새 작업: ${new_prompt}"
   else
     local orig_prompt=$(cat "$tmpdir/prompt.txt" 2>/dev/null)
-    ctx_msg="이전 AI들의 작업 컨텍스트를 읽어주세요: ${tmpdir}/context.md 이어서 작업하세요: ${orig_prompt}"
+    ctx_msg="반드시 ${tmpdir}/context.md 를 열어 최신 입력을 확인한 뒤 즉시 응답하세요(추가 질문 금지). 이어서 작업: ${orig_prompt}"
   fi
 
   # auto-type into next AI pane via send-keys

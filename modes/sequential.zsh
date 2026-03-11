@@ -42,10 +42,11 @@ printf '  \033[2m⏳ 턴 대기중 (#%s)...\033[0m\n' "$my_turn"
 while true; do
   turn=$(cat "$tmpdir/seq_turn.txt" 2>/dev/null)
   [ "$turn" = "$my_turn" ] && break
-  sleep 0.5
+  sleep 0.1
 done
 _seq_round=$(( _seq_round + 1 ))
-printf '  \033[38;5;220m\033[1m▶ Your turn! (round %s)\033[0m\n\n' "$_seq_round"
+printf '\a' # Terminal Bell (Visual sound)
+printf '  \033[38;5;141m\033[1m\033[5m⚡\033[0m \033[38;5;213m\033[1mROUND %s: YOUR TURN!\033[0m \033[38;5;141m\033[1m\033[5m⚡\033[0m\n\n' "$_seq_round"
 
 # ── inject previous AI's changes as context ──
 prev_diff_file="$tmpdir/diff_turn_$((my_turn - 1)).txt"
@@ -69,6 +70,35 @@ _mode_gen_done_logic() {
 # save diff for next AI's context (sequential: chain to next AI)
 if [ -n "$my_turn" ] && [ -n "$_diff" ]; then
   echo "$_diff" > "$tmpdir/diff_turn_${my_turn}.txt"
+fi
+
+# capture pane output to shared context.md before advancing
+if [ -n "$my_turn" ]; then
+  _pane_out=$(tmux capture-pane -p -S -50 2>/dev/null | sed '/^[[:space:]]*$/d' | tail -n 20)
+  _round=$(cat "$tmpdir/round.txt" 2>/dev/null || echo "1")
+  _changed_files=$(git diff HEAD~1..HEAD --name-only 2>/dev/null)
+  {
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "📍 ROUND ${_round} | TURN ${my_turn} | AGENT: ${toolname}"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    if [ -n "$_changed_files" ]; then
+      echo "📂 Modified Files:"
+      echo "$_changed_files" | sed 's/^/- /'
+      echo ""
+    fi
+    echo "💬 Last Output:"
+    echo '```'
+    echo "$_pane_out"
+    echo '```'
+    if [ -n "$_diff_stat" ]; then
+      echo "📊 Diff Summary:"
+      echo '```'
+      echo "$_diff_stat"
+      echo '```'
+    fi
+    echo ""
+  } >> "$tmpdir/context.md"
 fi
 
 # sequential mode: auto-advance to next turn

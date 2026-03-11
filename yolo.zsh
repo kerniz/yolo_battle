@@ -146,27 +146,25 @@ yolo() {
 
     local total_lines=0
     printf "\n"
-    printf "  ${purple}${bold}╔══════════════════════════════════════╗${reset}\n"
-    printf "  ${purple}${bold}║${reset}  ${yellow}${bold}⚡ Y O L O   M O D E ⚡${reset}             ${purple}${bold}║${reset}\n"
-    printf "  ${purple}${bold}║${reset}  ${dim}Pick your weapon, no guardrails.${reset}   ${purple}${bold}║${reset}\n"
-    printf "  ${purple}${bold}╠══════════════════════════════════════╣${reset}\n"
-    total_lines=5
+    printf "  ${purple}${bold}⚡ PICK YOUR WEAPON ⚡${reset}\n"
+    printf "  ${purple}${bold}┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓${reset}\n"
+    total_lines=2
 
     for ((j=1; j<=${#_yolo_opts[@]}; j++)); do
       local name="${_yolo_opts[$j]}"
       local icon="${_yolo_icons[$j]}"
       local col="${tcolors[$j]}"
       if [ $((j-1)) -eq "$i" ]; then
-        printf "  ${purple}${bold}║${reset} ${bg_sel} ${col}${bold} ▸ ${icon}  %-18s${reset}${bg_sel}      ${reset} ${purple}${bold}║${reset}\n" "${(U)name}"
+        printf "  ${purple}${bold}┃${reset} ${bg_sel} ${col}${bold} ▸ ${icon}  %-18s${reset}${bg_sel}      ${reset} ${purple}${bold}┃${reset}\n" "${(U)name}"
       else
-        printf "  ${purple}${bold}║${reset}   ${dim}   ${icon}  %-18s      ${reset} ${purple}${bold}║${reset}\n" "$name"
+        printf "  ${purple}${bold}┃${reset}   ${dim}   ${icon}  %-18s      ${reset} ${purple}${bold}┃${reset}\n" "$name"
       fi
       total_lines=$((total_lines + 1))
     done
 
-    printf "  ${purple}${bold}╠══════════════════════════════════════╣${reset}\n"
-    printf "  ${purple}${bold}║${reset}  ${dim}↑↓ navigate${reset}  ${dim}⏎ select${reset}             ${purple}${bold}║${reset}\n"
-    printf "  ${purple}${bold}╚══════════════════════════════════════╝${reset}\n"
+    printf "  ${purple}${bold}┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫${reset}\n"
+    printf "  ${purple}${bold}┃${reset}  ${dim}↑↓ navigate${reset}  ${dim}⏎ select${reset}             ${purple}${bold}┃${reset}\n"
+    printf "  ${purple}${bold}┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛${reset}\n"
     total_lines=$((total_lines + 3))
 
     while true; do
