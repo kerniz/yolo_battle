@@ -720,12 +720,39 @@ _do_next() {
   fi
   local new_prompt="$*"
   local cur=$(cat "$tmpdir/seq_turn.txt" 2>/dev/null)
+  local round=$(cat "$tmpdir/round.txt" 2>/dev/null || echo "1")
+
+  # 📍 Improvement: Capture current turn's output before advancing
+  if [ "$cur" -ge 1 ]; then
+    local cur_tool_idx=${_cmd_seq_order[$cur]}
+    local cur_pane="${ai_panes[$cur_tool_idx]}"
+    local cur_tool="${_cmd_tools[$cur_tool_idx]}"
+    local log_flag="$tmpdir/logged_R${round}_T${cur}.txt"
+    
+    if [ ! -f "$log_flag" ]; then
+      printf "  ${dm}→ %s의 결과 캡처 중...${rst}\n" "$cur_tool"
+      local pane_out=$(tmux capture-pane -t "${cur_pane}" -p -S -50 2>/dev/null | sed '/^[[:space:]]*$/d' | tail -n 50)
+      local changed_files=$(git diff HEAD~1..HEAD --name-only 2>/dev/null)
+      {
+        echo ""
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "📍 ROUND ${round} | TURN ${cur} | AGENT: ${cur_tool} (MANUAL NEXT)"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        [ -n "$changed_files" ] && echo "📂 Modified Files:" && echo "$changed_files" | sed 's/^/- /' && echo ""
+        echo "💬 Last Output:"
+        echo '```'
+        # 📍 Strip ANSI colors for cleaner context relay
+        echo "$pane_out" | perl -pe 's/\x1b\[[0-9;]*[mGKH]//g' 2>/dev/null || echo "$pane_out"
+        echo '```'
+        echo ""
+      } >> "$tmpdir/context.md"
+      touch "$log_flag"
+    fi
+  fi
 
   # calculate next turn (round-robin: wraps around)
   local next=$(( cur + 1 ))
   local cnt=${#_cmd_seq_order[@]}
-  local round=$(cat "$tmpdir/round.txt" 2>/dev/null)
-  [ -z "$round" ] && round=1
 
   if [ $next -gt $cnt ]; then
     next=1

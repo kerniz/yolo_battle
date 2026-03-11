@@ -74,31 +74,48 @@ fi
 
 # capture pane output to shared context.md before advancing
 if [ -n "$my_turn" ]; then
-  _pane_out=$(tmux capture-pane -p -S -50 2>/dev/null | sed '/^[[:space:]]*$/d' | tail -n 20)
   _round=$(cat "$tmpdir/round.txt" 2>/dev/null || echo "1")
-  _changed_files=$(git diff HEAD~1..HEAD --name-only 2>/dev/null)
-  {
-    echo ""
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "📍 ROUND ${_round} | TURN ${my_turn} | AGENT: ${toolname}"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    if [ -n "$_changed_files" ]; then
-      echo "📂 Modified Files:"
-      echo "$_changed_files" | sed 's/^/- /'
+  local log_flag="$tmpdir/logged_R${_round}_T${my_turn}.txt"
+
+  # 📍 Improvement: Unify logging with /next. Only log if not already captured.
+  if [ ! -f "$log_flag" ]; then
+    # Increase capture efficiency (last 50 lines) and avoid duplicates
+    _pane_out=$(tmux capture-pane -p -S -50 2>/dev/null | sed '/^[[:space:]]*$/d' | tail -n 50)
+    
+    # More robust changed files detection
+    _changed_files=$(git diff HEAD~1..HEAD --name-only 2>/dev/null)
+    
+    {
       echo ""
-    fi
-    echo "💬 Last Output:"
-    echo '```'
-    echo "$_pane_out"
-    echo '```'
-    if [ -n "$_diff_stat" ]; then
-      echo "📊 Diff Summary:"
+      echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      echo "📍 ROUND ${_round} | TURN ${my_turn} | AGENT: ${toolname} (AUTO DONE)"
+      echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      if [ -n "$_changed_files" ]; then
+        echo "📂 Modified Files:"
+        echo "$_changed_files" | sed 's/^/- /'
+        echo ""
+      fi
+      echo "💬 Last Output:"
       echo '```'
-      echo "$_diff_stat"
+      # 📍 Strip ANSI colors for cleaner context relay
+      echo "$_pane_out" | perl -pe 's/\x1b\[[0-9;]*[mGKH]//g' 2>/dev/null || echo "$_pane_out"
       echo '```'
+      if [ -n "$_diff_stat" ]; then
+        echo "📊 Diff Summary:"
+        echo '```'
+        echo "$_diff_stat"
+        echo '```'
+      fi
+      echo ""
+    } >> "$tmpdir/context.md"
+    touch "$log_flag"
+
+    # 📍 Improvement: Truncate context.md if it gets too long (Future Task)
+    if [ $(wc -l < "$tmpdir/context.md") -gt 10000 ]; then
+      echo "  \033[2m(context.md truncated due to length)\033[0m"
+      tail -5000 "$tmpdir/context.md" > "$tmpdir/context.md.tmp" && mv "$tmpdir/context.md.tmp" "$tmpdir/context.md"
     fi
-    echo ""
-  } >> "$tmpdir/context.md"
+  fi
 fi
 
 # sequential mode: auto-advance to next turn
