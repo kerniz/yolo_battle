@@ -24,16 +24,63 @@ _mode_setup_context() {
   echo "" >> "$tmpdir/shared.md"
 }
 
-# ── roles ──
+# ── available roles ──
+_mode_available_roles=("Core" "Tests" "Config" "Review" "Docs" "Frontend" "Backend" "DB" "Security" "Refactor" "API" "Perf" "A11y" "i18n" "Migration" "Debug" "Architect")
+_mode_available_role_descs=(
+  "핵심 구현/소스코드 개발"
+  "테스트 작성 및 검증"
+  "빌드/CI·CD/인프라 설정"
+  "코드 리뷰 및 품질 검증"
+  "문서화 (README, API docs)"
+  "프론트엔드 UI/UX 개발"
+  "백엔드 API/서버 개발"
+  "데이터베이스 설계/마이그레이션"
+  "보안 점검 및 취약점 분석"
+  "코드 리팩토링 및 최적화"
+  "API 설계/엔드포인트 정의"
+  "성능 프로파일링/최적화"
+  "접근성(a11y) 검증"
+  "국제화/번역(i18n)"
+  "데이터/스키마 마이그레이션"
+  "버그 원인 분석/디버깅"
+  "아키텍처 설계/구조 결정"
+)
+_mode_available_role_icons=("⚙️" "🧪" "🔧" "👀" "📝" "🎨" "🖥️" "🗄️" "🔒" "♻️" "🔌" "⚡" "♿" "🌐" "📦" "🐛" "🏛️")
+
+# default roles (overridden by interactive selection)
 _mode_roles=("Core" "Tests" "Config")
+
+_mode_role_prompt_for() {
+  local role="$1" tmpdir="$2" prompt="$3"
+  local board_msg="After completing work, write a summary of what you did to the shared board: ${tmpdir}/shared.md (append, don't overwrite). Check the shared board to see what other AIs are doing to avoid duplication."
+  case "$role" in
+    Core)      echo "You are the core developer. Focus ONLY on main implementation/source code. Do NOT create or modify test files, config files, or documentation. ${board_msg} Task: ${prompt}" ;;
+    Tests)     echo "You are the test engineer. Write tests and test utilities ONLY. Do NOT modify any implementation/source code. Only create/edit files in test directories or files with test/spec in their name. ${board_msg} Task: ${prompt}" ;;
+    Config)    echo "You are the DevOps/config engineer. Handle ONLY build config, CI/CD, and infrastructure files. Do NOT modify implementation code or test files. ${board_msg} Task: ${prompt}" ;;
+    Review)    echo "You are the code reviewer. Review the codebase for bugs, code quality issues, and improvements. Do NOT modify code directly - write review comments and suggestions to the shared board. ${board_msg} Task: ${prompt}" ;;
+    Docs)      echo "You are the documentation writer. Write and update documentation ONLY (README, API docs, comments, guides). Do NOT modify implementation code or test files. ${board_msg} Task: ${prompt}" ;;
+    Frontend)  echo "You are the frontend developer. Focus ONLY on frontend UI/UX code (HTML, CSS, JS, React, Vue, etc). Do NOT modify backend or infrastructure code. ${board_msg} Task: ${prompt}" ;;
+    Backend)   echo "You are the backend developer. Focus ONLY on backend API/server code. Do NOT modify frontend UI code or infrastructure files. ${board_msg} Task: ${prompt}" ;;
+    DB)        echo "You are the database engineer. Focus ONLY on database schema, migrations, queries, and data models. Do NOT modify application logic or UI code. ${board_msg} Task: ${prompt}" ;;
+    Security)  echo "You are the security engineer. Analyze and fix security vulnerabilities ONLY. Focus on input validation, auth, XSS, SQL injection, and OWASP top 10. ${board_msg} Task: ${prompt}" ;;
+    Refactor)  echo "You are the refactoring specialist. Improve code structure, reduce duplication, and optimize performance WITHOUT changing external behavior. ${board_msg} Task: ${prompt}" ;;
+    API)       echo "You are the API designer. Focus ONLY on API endpoint design, request/response schemas, and API documentation (OpenAPI/Swagger). Do NOT implement business logic or UI code. ${board_msg} Task: ${prompt}" ;;
+    Perf)      echo "You are the performance engineer. Profile and optimize performance bottlenecks. Write benchmarks, identify slow paths, and suggest/implement optimizations. Do NOT change functionality. ${board_msg} Task: ${prompt}" ;;
+    A11y)      echo "You are the accessibility specialist. Audit and fix accessibility issues (WCAG compliance, ARIA attributes, keyboard navigation, screen reader support). Focus ONLY on a11y improvements. ${board_msg} Task: ${prompt}" ;;
+    i18n)      echo "You are the internationalization engineer. Handle translations, locale support, date/number formatting, and i18n infrastructure. Do NOT modify core business logic. ${board_msg} Task: ${prompt}" ;;
+    Migration) echo "You are the migration specialist. Focus ONLY on data migrations, schema migrations, and version upgrade scripts. Ensure backward compatibility and rollback safety. ${board_msg} Task: ${prompt}" ;;
+    Debug)     echo "You are the debugger. Analyze bugs, trace root causes, add diagnostic logging, and fix issues. Focus on understanding WHY bugs occur before fixing them. Report findings to the shared board. ${board_msg} Task: ${prompt}" ;;
+    Architect) echo "You are the software architect. Design system architecture, define component boundaries, and make structural decisions. Write architecture docs and diagrams (mermaid). Do NOT implement code directly - guide other developers via the shared board. ${board_msg} Task: ${prompt}" ;;
+    *)         echo "You are a developer with role: ${role}. ${board_msg} Task: ${prompt}" ;;
+  esac
+}
 
 _mode_setup_roles() {
   local tmpdir="$1" prompt="$2"
-  _mode_role_prompts=(
-    "You are the core developer. Focus ONLY on main implementation/source code. Do NOT create or modify test files, config files, or documentation. After completing work, write a summary of what you did to the shared board: ${tmpdir}/shared.md (append, don't overwrite). Task: ${prompt}"
-    "You are the test engineer. Write tests and test utilities ONLY. Do NOT modify any implementation/source code. Only create/edit files in test directories or files with test/spec in their name. After completing work, write a summary of what you did to the shared board: ${tmpdir}/shared.md (append, don't overwrite). Check the shared board to see what other AIs are doing to avoid duplication. Task: ${prompt}"
-    "You are the DevOps/config engineer. Handle ONLY build config, documentation, CI/CD, and infrastructure files. Do NOT modify implementation code or test files. After completing work, write a summary of what you did to the shared board: ${tmpdir}/shared.md (append, don't overwrite). Check the shared board to see what other AIs are doing to avoid duplication. Task: ${prompt}"
-  )
+  _mode_role_prompts=()
+  for ((ri=1; ri<=${#_mode_roles[@]}; ri++)); do
+    _mode_role_prompts+=("$(_mode_role_prompt_for "${_mode_roles[$ri]}" "$tmpdir" "$prompt")")
+  done
 }
 
 # ── wait logic (heredoc injected into run script) ──

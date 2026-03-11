@@ -309,6 +309,106 @@ _yolo_battle() {
   # ── role definitions (from mode skill) ──
   local -a _roles _role_prompts
   _roles=("${_mode_roles[@]}")
+
+  # ── collaborative mode: interactive role selection ──
+  if [[ "$mode" == "collaborative" ]] && [ -t 0 ] && ! $_is_restart && [ ${#_mode_available_roles[@]} -gt 0 ]; then
+    local -a _avail_roles=("${_mode_available_roles[@]}")
+    local -a _avail_descs=("${_mode_available_role_descs[@]}")
+    local -a _avail_icons=("${_mode_available_role_icons[@]}")
+    local _avail_cnt=${#_avail_roles[@]}
+
+    # per-AI role assignment
+    _roles=()
+    for ((_ai_idx=1; _ai_idx<=$cnt; _ai_idx++)); do
+      local _ri=0
+      local _rkey
+      local cursor_up=$'\033[A'
+      local cursor_down=$'\033[B'
+      local bg_sel=$'\033[48;5;236m'
+
+      # set default cursor to a sensible position
+      case $_ai_idx in
+        1) _ri=0 ;;  # Core
+        2) _ri=1 ;;  # Tests
+        3) _ri=2 ;;  # Config
+        *) _ri=$(( (_ai_idx - 1) % _avail_cnt )) ;;
+      esac
+
+      printf "\033[?25l"
+      trap 'printf "\033[?25h"' INT
+
+      local _rh_lines=5  # header lines
+      local _rf_lines=1  # footer line
+
+      printf "\n"
+      printf "  ${purple}${bold}╔══════════════════════════════════════╗${reset}\n"
+      printf "  ${purple}${bold}║${reset}  ${tcolors[$_ai_idx]}${bold}${_yolo_icons[$_ai_idx]}  ${(U)_yolo_opts[$_ai_idx]}${reset} ${dim}역할 선택${reset}            ${purple}${bold}║${reset}\n"
+      printf "  ${purple}${bold}║${reset}  ${dim}↑↓ 이동  ⏎ 선택${reset}                   ${purple}${bold}║${reset}\n"
+      printf "  ${purple}${bold}╠══════════════════════════════════════╣${reset}\n"
+      for ((rj=1; rj<=$_avail_cnt; rj++)); do
+        if [ $((rj-1)) -eq "$_ri" ]; then
+          printf "  ${purple}${bold}║${reset} ${bg_sel} ${green}${bold} ▸ ${_avail_icons[$rj]} %-10s${reset}${bg_sel}${dim}%-16s${reset}${bg_sel} ${reset}${purple}${bold}║${reset}\n" "${_avail_roles[$rj]}" "${_avail_descs[$rj]}"
+        else
+          printf "  ${purple}${bold}║${reset}     ${dim}${_avail_icons[$rj]} %-10s%-16s${reset}   ${purple}${bold}║${reset}\n" "${_avail_roles[$rj]}" "${_avail_descs[$rj]}"
+        fi
+      done
+      printf "  ${purple}${bold}╚══════════════════════════════════════╝${reset}\n"
+
+      while true; do
+        read -rs -k1 _rkey
+        if [[ "$_rkey" == $'\033' ]]; then
+          read -rs -k2 _rkey
+          _rkey=$'\033'"$_rkey"
+        fi
+
+        case "$_rkey" in
+          "$cursor_up")
+            _ri=$(( (_ri - 1 + _avail_cnt) % _avail_cnt ))
+            ;;
+          "$cursor_down")
+            _ri=$(( (_ri + 1) % _avail_cnt ))
+            ;;
+          $'\n')
+            break
+            ;;
+          *)
+            continue
+            ;;
+        esac
+
+        # redraw items + footer
+        printf "\033[$(($_avail_cnt + $_rf_lines))A"
+        for ((rj=1; rj<=$_avail_cnt; rj++)); do
+          if [ $((rj-1)) -eq "$_ri" ]; then
+            printf "\r  ${purple}${bold}║${reset} ${bg_sel} ${green}${bold} ▸ ${_avail_icons[$rj]} %-10s${reset}${bg_sel}${dim}%-16s${reset}${bg_sel} ${reset}${purple}${bold}║${reset}\n" "${_avail_roles[$rj]}" "${_avail_descs[$rj]}"
+          else
+            printf "\r  ${purple}${bold}║${reset}     ${dim}${_avail_icons[$rj]} %-10s%-16s${reset}   ${purple}${bold}║${reset}\n" "${_avail_roles[$rj]}" "${_avail_descs[$rj]}"
+          fi
+        done
+        printf "\033[${_rf_lines}B"
+      done
+
+      _roles+=("${_avail_roles[$((_ri+1))]}")
+
+      # clear role selection UI
+      local _total_role_lines=$((_rh_lines + _avail_cnt + _rf_lines))
+      printf "\033[${_total_role_lines}A\033[J"
+
+      printf "\033[?25h"
+      trap - INT
+    done
+
+    # show assigned roles
+    printf "\n"
+    printf "  ${green}${bold}🤝 역할 배정:${reset}\n"
+    for ((j=1; j<=$cnt; j++)); do
+      printf "   ${tcolors[$j]}${_yolo_icons[$j]} ${_yolo_opts[$j]}${reset} → ${yellow}${bold}${_roles[$j]}${reset}\n"
+    done
+    printf "\n"
+
+    _mode_roles=("${_roles[@]}")
+  fi
+
   if [ -n "$prompt" ]; then
     _mode_setup_roles "$tmpdir" "$prompt"
     _role_prompts=("${_mode_role_prompts[@]}")
