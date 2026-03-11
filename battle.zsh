@@ -406,6 +406,8 @@ DONE_LOGIC
 
       cat << 'DONE_END'
 printf '\n  \033[2m[AI 프로세스 종료됨]\033[0m\n'
+# keep pane alive to prevent tmux session termination
+while true; do sleep 3600; done
 DONE_END
     } > "$script"
     chmod +x "$script"
@@ -1409,6 +1411,7 @@ CMD_BODY
   # ── layout protection ──
   tmux set-option -t "$session" aggressive-resize on 2>/dev/null
   tmux set-option -t "$session" allow-passthrough off 2>/dev/null
+  tmux set-option -t "$session" remain-on-exit on 2>/dev/null
   for _pid in "${_ai_pane_ids[@]}" "$_cmd_pane_id"; do
     tmux set-option -p -t "$_pid" remain-on-exit on 2>/dev/null
   done

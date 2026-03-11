@@ -31,15 +31,21 @@ while IFS=: read -r tidx tnum; do
 done < "$tmpdir/seq_order_map.txt"
 [ -z "$my_turn" ] && my_turn="$toolidx"
 
+_seq_round=0
+while true; do  # ── sequential multi-round loop ──
+
 echo "waiting" > "$statusfile"
-printf '  \033[2m📋 순차 모드 - 턴 #%s (공유 컨텍스트: %s/context.md)\033[0m\n' "$my_turn" "$tmpdir"
+if [ "$_seq_round" -eq 0 ]; then
+  printf '  \033[2m📋 순차 모드 - 턴 #%s (공유 컨텍스트: %s/context.md)\033[0m\n' "$my_turn" "$tmpdir"
+fi
 printf '  \033[2m⏳ 턴 대기중 (#%s)...\033[0m\n' "$my_turn"
 while true; do
   turn=$(cat "$tmpdir/seq_turn.txt" 2>/dev/null)
   [ "$turn" = "$my_turn" ] && break
   sleep 0.5
 done
-printf '  \033[38;5;220m\033[1m▶ Your turn!\033[0m\n\n'
+_seq_round=$(( _seq_round + 1 ))
+printf '  \033[38;5;220m\033[1m▶ Your turn! (round %s)\033[0m\n\n' "$_seq_round"
 
 # ── inject previous AI's changes as context ──
 prev_diff_file="$tmpdir/diff_turn_$((my_turn - 1)).txt"
@@ -81,6 +87,8 @@ if [ -n "$my_turn" ]; then
   echo "$next_turn" > "$tmpdir/seq_turn.txt"
   printf '\n  \033[38;5;220m\033[1m▶ 다음 턴 (#%s) 자동 시작\033[0m\n' "$next_turn"
 fi
+
+done  # ── end sequential multi-round loop ──
 EOF
 }
 
