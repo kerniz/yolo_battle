@@ -12,8 +12,17 @@ _mode_input_routing="current_only"  # send to current turn AI only
 # ── context setup ──
 _mode_setup_context() {
   local tmpdir="$1" cnt="$2"
-  echo "# Sequential Mode Context (릴레이)" > "$tmpdir/context.md"
-  echo "" >> "$tmpdir/context.md"
+  cat > "$tmpdir/context.md" << 'CTXEOF'
+# Sequential Mode Context (릴레이)
+
+## 규칙
+- 1턴에 1개 작업만 수행하세요. 작업 완료 후 결과를 아래에 기록하세요.
+- 이 파일(context.md)에만 작업 결과를 기록하세요. 터미널 로그를 복사하지 마세요.
+- 이전 AI의 작업 내용을 확인하고 이어서 작업하세요.
+
+## 작업 기록
+CTXEOF
+  : > "$tmpdir/log.md"
 }
 
 # ── default prompt (no user prompt given) ──
@@ -68,7 +77,7 @@ EOF
 # ── prompt injection ──
 _mode_prompt_inject() {
   local tmpdir="$1"
-  echo 'prompt="[공유 컨텍스트: '"$tmpdir"'/context.md - 이전 AI 작업 내용이 누적됩니다] ${prompt}"'
+  echo 'prompt="[공유 컨텍스트: '"$tmpdir"'/context.md - 이전 AI 작업 내용이 누적됩니다] 순차모드 규칙: 1턴에 1개 작업만 수행. 작업 결과를 context.md의 \"작업 기록\" 섹션 끝에 추가 기록하세요. ${prompt}"'
 }
 
 # ── done logic additions ──
@@ -114,13 +123,13 @@ if [ -n "$my_turn" ]; then
         echo '```'
       fi
       echo ""
-    } >> "$tmpdir/context.md"
+    } >> "$tmpdir/log.md"
     touch "$log_flag"
 
-    # 📍 Improvement: Truncate context.md if it gets too long (Future Task)
-    if [ $(wc -l < "$tmpdir/context.md") -gt 10000 ]; then
-      echo "  \033[2m(context.md truncated due to length)\033[0m"
-      tail -5000 "$tmpdir/context.md" > "$tmpdir/context.md.tmp" && mv "$tmpdir/context.md.tmp" "$tmpdir/context.md"
+    # 📍 Improvement: Truncate log.md if it gets too long
+    if [ $(wc -l < "$tmpdir/log.md") -gt 10000 ]; then
+      echo "  \033[2m(log.md truncated due to length)\033[0m"
+      tail -5000 "$tmpdir/log.md" > "$tmpdir/log.md.tmp" && mv "$tmpdir/log.md.tmp" "$tmpdir/log.md"
     fi
   fi
 fi

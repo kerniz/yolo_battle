@@ -938,6 +938,7 @@ _do_save() {
   cp "$tmpdir/mode.txt" "$savedir/mode.txt" 2>/dev/null
   # save context files
   cp "$tmpdir"/context*.md(N) "$savedir/" 2>/dev/null
+  cp "$tmpdir"/log.md "$savedir/" 2>/dev/null
   cp "$tmpdir"/shared.md "$savedir/" 2>/dev/null
   printf "  ${grn}${bld}✔ 저장됨:${rst} ${dm}${savedir}${rst}\n"
   printf "  ${dm}  파일: prompt.txt"
@@ -989,7 +990,7 @@ _do_next() {
         echo "$pane_out" | perl -pe 's/\x1b\[[0-9;]*[mGKH]//g' 2>/dev/null || echo "$pane_out"
         echo '```'
         echo ""
-      } >> "$tmpdir/context.md"
+      } >> "$tmpdir/log.md"
       touch "$log_flag"
     fi
   fi
@@ -1018,13 +1019,13 @@ _do_next() {
   if [ -n "$new_prompt" ]; then
     _last_user_cmd="$new_prompt"
     printf '%s' "$new_prompt" > "$tmpdir/user_cmd.txt"
-    ctx_msg="반드시 ${tmpdir}/context.md 를 열어 최신 입력을 확인한 뒤 즉시 응답하세요(추가 질문 금지). 새 작업: ${new_prompt}"
+    ctx_msg="반드시 ${tmpdir}/context.md 를 열어 최신 입력을 확인한 뒤 즉시 응답하세요(추가 질문 금지). 1턴 1작업 규칙을 지키고, 결과를 context.md에 기록하세요. 새 작업: ${new_prompt}"
   else
     local last_cmd="$_last_user_cmd"
     if [ -z "$last_cmd" ]; then
       last_cmd=$(cat "$tmpdir/user_cmd.txt" 2>/dev/null)
     fi
-    ctx_msg="반드시 ${tmpdir}/context.md 를 열어 최신 입력을 확인한 뒤 즉시 응답하세요(추가 질문 금지). 이어서 작업: ${last_cmd}"
+    ctx_msg="반드시 ${tmpdir}/context.md 를 열어 최신 입력을 확인한 뒤 즉시 응답하세요(추가 질문 금지). 1턴 1작업 규칙을 지키고, 결과를 context.md에 기록하세요. 이어서 작업: ${last_cmd}"
   fi
 
   # update prompt.txt BEFORE advancing turn so run script picks up relay message
