@@ -899,14 +899,14 @@ _send_to_pane() {
   case "$tool" in
     gemini)
       tmux send-keys -t "${pane}" Enter 2>/dev/null
-      sleep 0.2
+      sleep 0.8
       tmux send-keys -t "${pane}" Enter 2>/dev/null
-      sleep 0.2
+      sleep 0.8
       tmux send-keys -t "${pane}" Enter 2>/dev/null
       ;;
     codex)
       tmux send-keys -t "${pane}" Enter 2>/dev/null
-      sleep 0.2
+      sleep 0.8
       tmux send-keys -t "${pane}" Enter 2>/dev/null
       ;;
     *)
