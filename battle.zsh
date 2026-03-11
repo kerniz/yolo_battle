@@ -1026,7 +1026,14 @@ _do_next() {
 
   # update prompt.txt BEFORE advancing turn so run script picks up relay message
   printf '%s' "$ctx_msg" > "$tmpdir/prompt.txt"
-  printf "  ${dm}→ ${_cmd_icons[$next_tool_idx]} ${next_tool} 프롬프트 갱신됨${rst}\n"
+
+  # 이미 실행 중인 AI에게는 pane으로 직접 relay 메시지 전송 (round 2+)
+  if [ -f "$tmpdir/started_${next_tool}.txt" ]; then
+    printf "  ${dm}→ ${_cmd_icons[$next_tool_idx]} ${next_tool} pane에 relay 전송${rst}\n"
+    _send_to_pane "${next_pane}" "${next_tool}" "$ctx_msg"
+  else
+    printf "  ${dm}→ ${_cmd_icons[$next_tool_idx]} ${next_tool} 프롬프트 갱신됨${rst}\n"
+  fi
 }
 
 # ════════════════════════════════════════
@@ -1381,35 +1388,73 @@ _auto_start() {
   (
     local last_mtime=$(_auto_get_mtime)
     [ -z "$last_mtime" ] && last_mtime="0"
+    local ctx_changed=false
+    local last_pane_hash=""
+    local last_pane_change_ts=$(date +%s)
 
     while true; do
       sleep 2
       local cur_mtime=$(_auto_get_mtime)
       [ -z "$cur_mtime" ] && cur_mtime="0"
 
-      # context 변경 감지
+      # ── context 변경 감지 ──
       if [[ "$cur_mtime" != "$last_mtime" ]]; then
-        printf "\033[s\033[2;1H\033[2K  ${dm}⏳ context 변경 감지 — settle 대기 ${settle}s ...${rst}\033[u"
-        local i="$settle"
-        while (( i > 0 )); do
-          printf "\033[s\033[2;1H\033[2K  ${dm}⏳ context 변경 감지 — settle 대기 ${i}s ...${rst}\033[u"
-          sleep 1
-          (( i-- ))
-        done
-        printf "\033[s\033[2;1H\033[2K\033[u"
-        local settled_mtime=$(_auto_get_mtime)
-        if [[ "$settled_mtime" == "$cur_mtime" ]]; then
-          printf "\n  ${cyn}${bld}🔄 context 변경 감지 → /next 자동 실행${rst}\n"
-          _do_next
-          last_mtime=$(_auto_get_mtime)
+        ctx_changed=true
+        last_mtime="$cur_mtime"
+      fi
+
+      # ── pane 변경 감지 (현재 턴 AI의 pane hash) ──
+      local cur_pane_hash=""
+      if [[ "$mode" == "sequential" ]]; then
+        local cur=$(cat "$tmpdir/seq_turn.txt" 2>/dev/null)
+        if [ -n "$cur" ]; then
+          local cur_tool_idx=${_cmd_seq_order[$cur]}
+          if [ -n "$cur_tool_idx" ]; then
+            local cur_pane="${ai_panes[$cur_tool_idx]}"
+            local pane_out=$(tmux capture-pane -t "${cur_pane}" -p -S -30 2>/dev/null | sed '/^[[:space:]]*$/d' | tail -n 30)
+            if [ -n "$pane_out" ]; then
+              cur_pane_hash=$(printf '%s' "$pane_out" | shasum -a 256 | awk '{print $1}')
+            fi
+          fi
+        fi
+      fi
+
+      # pane 변경 시 타임스탬프 갱신
+      if [ -n "$cur_pane_hash" ] && [[ "$cur_pane_hash" != "$last_pane_hash" ]]; then
+        last_pane_hash="$cur_pane_hash"
+        last_pane_change_ts=$(date +%s)
+      fi
+
+      # ── AND 조건: context 변경됨 + pane이 settle초간 안정 ──
+      if $ctx_changed; then
+        local now=$(date +%s)
+        local pane_stable_secs=$(( now - last_pane_change_ts ))
+        local remaining=$(( settle - pane_stable_secs ))
+
+        if (( remaining > 0 )); then
+          printf "\033[s\033[2;1H\033[2K  ${dm}⏳ context 변경 감지 — pane 안정화 대기 ${remaining}s ...${rst}\033[u"
         else
-          last_mtime="$settled_mtime"
+          # settle 완료 — 최종 확인
+          printf "\033[s\033[2;1H\033[2K\033[u"
+          local final_mtime=$(_auto_get_mtime)
+          if [[ "$final_mtime" == "$last_mtime" ]]; then
+            # context도 pane도 안정화됨 → /next 실행
+            printf "\n  ${cyn}${bld}🔄 context+pane 안정화 → /next 자동 실행${rst}\n"
+            _do_next
+            last_mtime=$(_auto_get_mtime)
+            ctx_changed=false
+            last_pane_hash=""
+            last_pane_change_ts=$(date +%s)
+          else
+            # context가 다시 변경됨 — 리셋
+            last_mtime="$final_mtime"
+          fi
         fi
       fi
     done
   ) &
   _auto_pid=$!
-  printf "  ${grn}${bld}✔ /auto 시작${rst} ${dm}(context 변경 감지 모드, settle=${settle}s)${rst}\n"
+  printf "  ${grn}${bld}✔ /auto 시작${rst} ${dm}(context+pane AND 감지, settle=${settle}s)${rst}\n"
 }
 
 _auto_stop() {

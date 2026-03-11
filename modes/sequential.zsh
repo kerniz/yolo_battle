@@ -50,6 +50,8 @@ while true; do
   sleep 0.1
 done
 _seq_round=$(( _seq_round + 1 ))
+# 첫 활성화 플래그 (round 2+에서 _do_next가 pane으로 직접 전송하기 위해)
+touch "$tmpdir/started_${toolname}.txt"
 printf '\a' # Terminal Bell (Visual sound)
 printf '  \033[38;5;141m\033[1m\033[5m⚡\033[0m \033[38;5;213m\033[1mROUND %s: YOUR TURN!\033[0m \033[38;5;141m\033[1m\033[5m⚡\033[0m\n\n' "$_seq_round"
 
