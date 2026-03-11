@@ -1473,7 +1473,8 @@ _auto_stop() {
 # AUTO-NEXT: auto-start in sequential mode
 # ════════════════════════════════════════
 if [[ "$mode" == "sequential" ]]; then
-  printf "  ${dm}💡 /auto 로 자동 릴레이 활성화 (기본 settle=10s)${rst}\n"
+  _auto_start 10
+  printf "  ${cyn}${bld}🔄 /auto 자동 활성화 (순차모드, settle=10s)${rst}\n"
 fi
 
 # ════════════════════════════════════════
