@@ -1375,172 +1375,41 @@ _auto_get_mtime() {
   stat -f %m "$tmpdir"/context*.md 2>/dev/null | sort -rn | head -1
 }
 
-_auto_try_capture_pane() {
-  local settle="$1"
-  [[ "$mode" != "sequential" ]] && return 1
-
-  local cur=$(cat "$tmpdir/seq_turn.txt" 2>/dev/null)
-  [ -z "$cur" ] && return 1
-  local round=$(cat "$tmpdir/round.txt" 2>/dev/null)
-  [ -z "$round" ] && round=1
-
-  local cur_tool_idx=${_cmd_seq_order[$cur]}
-  [ -z "$cur_tool_idx" ] && return 1
-  local cur_pane="${ai_panes[$cur_tool_idx]}"
-  local cur_tool="${_cmd_tools[$cur_tool_idx]}"
-  local log_flag="$tmpdir/logged_R${round}_T${cur}.txt"
-  [ -f "$log_flag" ] && return 1
-
-  local pane_out=$(tmux capture-pane -t "${cur_pane}" -p -S -50 2>/dev/null | sed '/^[[:space:]]*$/d' | tail -n 50)
-  [ -z "$pane_out" ] && return 1
-
-  local hash=$(printf '%s' "$pane_out" | shasum -a 256 | awk '{print $1}')
-  local hash_file="$tmpdir/panehash_R${round}_T${cur}.txt"
-  if [ ! -f "$hash_file" ]; then
-    printf '%s' "$hash" > "$hash_file"
-    return 1
-  fi
-
-  local last_hash=$(cat "$hash_file" 2>/dev/null)
-  if [ -n "$last_hash" ] && [ "$hash" = "$last_hash" ]; then
-    return 1
-  fi
-
-  printf "\033[s\033[2;1H\033[2K  ${dm}⏳ pane 변경 감지 — settle 대기 ${settle}s ...${rst}\033[u"
-  local i="$settle"
-  while (( i > 0 )); do
-    printf "\033[s\033[2;1H\033[2K  ${dm}⏳ pane 변경 감지 — settle 대기 ${i}s ...${rst}\033[u"
-    sleep 1
-    (( i-- ))
-  done
-  printf "\033[s\033[2;1H\033[2K\033[u"
-
-  local pane_out2=$(tmux capture-pane -t "${cur_pane}" -p -S -50 2>/dev/null | sed '/^[[:space:]]*$/d' | tail -n 50)
-  local hash2=$(printf '%s' "$pane_out2" | shasum -a 256 | awk '{print $1}')
-  printf '%s' "$hash2" > "$hash_file"
-
-  if [ -n "$hash2" ] && [ "$hash2" = "$hash" ]; then
-    local changed_files=$(git diff HEAD~1..HEAD --name-only 2>/dev/null)
-    {
-      echo ""
-      echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-      echo "📍 ROUND ${round} | TURN ${cur} | AGENT: ${cur_tool} (AUTO LOG)"
-      echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-      [ -n "$changed_files" ] && echo "📂 Modified Files:" && echo "$changed_files" | sed 's/^/- /' && echo ""
-      echo "💬 Last Output:"
-      echo '```'
-      echo "$pane_out2" | perl -pe 's/\x1b\[[0-9;]*[mGKH]//g' 2>/dev/null || echo "$pane_out2"
-      echo '```'
-      echo ""
-    } >> "$tmpdir/context.md"
-    touch "$log_flag"
-    printf "\n  ${cyn}${bld}🔄 pane 변경 감지 → /next 자동 실행${rst}\n"
-    _do_next
-    return 0
-  fi
-
-  return 1
-}
-
 _auto_start() {
   local settle="${1:-15}"
   _auto_stop 2>/dev/null
   (
     local last_mtime=$(_auto_get_mtime)
     [ -z "$last_mtime" ] && last_mtime="0"
-    local last_pane_hash=""
-    local last_pane_change_ts=$(date +%s)
 
     while true; do
       sleep 2
       local cur_mtime=$(_auto_get_mtime)
       [ -z "$cur_mtime" ] && cur_mtime="0"
 
-      # context 변경 감지 (이전 /next 이후 변경 있는지)
-      local ctx_changed=false
+      # context 변경 감지
       if [[ "$cur_mtime" != "$last_mtime" ]]; then
-        ctx_changed=true
-      fi
-
-      # pane 안정성 추적 (sequential 모드)
-      if [[ "$mode" == "sequential" ]]; then
-        local cur=$(cat "$tmpdir/seq_turn.txt" 2>/dev/null)
-        local round=$(cat "$tmpdir/round.txt" 2>/dev/null)
-        [ -z "$round" ] && round=1
-        if [ -n "$cur" ]; then
-          local cur_tool_idx=${_cmd_seq_order[$cur]}
-          if [ -n "$cur_tool_idx" ]; then
-            local cur_pane="${ai_panes[$cur_tool_idx]}"
-            local pane_out=$(tmux capture-pane -t "${cur_pane}" -p -S -50 2>/dev/null | sed '/^[[:space:]]*$/d' | tail -n 50)
-            if [ -n "$pane_out" ]; then
-              local cur_hash=$(printf '%s' "$pane_out" | shasum -a 256 | awk '{print $1}')
-              if [[ "$cur_hash" != "$last_pane_hash" ]]; then
-                # pane이 변경됨 — 타이머 리셋
-                last_pane_hash="$cur_hash"
-                last_pane_change_ts=$(date +%s)
-              fi
-            fi
-          fi
-        fi
-
-        # AND 조건: context 변경 + pane이 settle초 이상 안정
-        local now=$(date +%s)
-        local pane_stable_secs=$(( now - last_pane_change_ts ))
-        local remaining=$(( settle - pane_stable_secs ))
-
-        if $ctx_changed && [ -n "$last_pane_hash" ] && (( pane_stable_secs >= settle )); then
-          # pane 결과를 context에 기록
-          local log_flag="$tmpdir/logged_R${round}_T${cur}.txt"
-          if [ ! -f "$log_flag" ]; then
-            local cur_tool="${_cmd_tools[$cur_tool_idx]}"
-            local changed_files=$(git diff HEAD~1..HEAD --name-only 2>/dev/null)
-            {
-              echo ""
-              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-              echo "📍 ROUND ${round} | TURN ${cur} | AGENT: ${cur_tool} (AUTO LOG)"
-              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-              [ -n "$changed_files" ] && echo "📂 Modified Files:" && echo "$changed_files" | sed 's/^/- /' && echo ""
-              echo "💬 Last Output:"
-              echo '```'
-              echo "$pane_out" | perl -pe 's/\x1b\[[0-9;]*[mGKH]//g' 2>/dev/null || echo "$pane_out"
-              echo '```'
-              echo ""
-            } >> "$tmpdir/context.md"
-            touch "$log_flag"
-          fi
-          printf "\n  ${cyn}${bld}🔄 context 변경 + pane ${pane_stable_secs}s 안정 → /next 자동 실행${rst}\n"
+        printf "\033[s\033[2;1H\033[2K  ${dm}⏳ context 변경 감지 — settle 대기 ${settle}s ...${rst}\033[u"
+        local i="$settle"
+        while (( i > 0 )); do
+          printf "\033[s\033[2;1H\033[2K  ${dm}⏳ context 변경 감지 — settle 대기 ${i}s ...${rst}\033[u"
+          sleep 1
+          (( i-- ))
+        done
+        printf "\033[s\033[2;1H\033[2K\033[u"
+        local settled_mtime=$(_auto_get_mtime)
+        if [[ "$settled_mtime" == "$cur_mtime" ]]; then
+          printf "\n  ${cyn}${bld}🔄 context 변경 감지 → /next 자동 실행${rst}\n"
           _do_next
           last_mtime=$(_auto_get_mtime)
-          last_pane_hash=""
-          last_pane_change_ts=$(date +%s)
-        elif $ctx_changed && [ -n "$last_pane_hash" ] && (( remaining > 0 )); then
-          printf "\033[s\033[2;1H\033[2K  ${dm}⏳ context 변경됨 — pane 안정 대기 ${remaining}s ...${rst}\033[u"
-        fi
-      else
-        # non-sequential: context 변경 후 settle초 안정 확인
-        if $ctx_changed; then
-          printf "\033[s\033[2;1H\033[2K  ${dm}⏳ context 변경 감지 — settle 대기 ${settle}s ...${rst}\033[u"
-          local i="$settle"
-          while (( i > 0 )); do
-            printf "\033[s\033[2;1H\033[2K  ${dm}⏳ context 변경 감지 — settle 대기 ${i}s ...${rst}\033[u"
-            sleep 1
-            (( i-- ))
-          done
-          printf "\033[s\033[2;1H\033[2K\033[u"
-          local settled_mtime=$(_auto_get_mtime)
-          if [[ "$settled_mtime" == "$cur_mtime" ]]; then
-            printf "\n  ${cyn}${bld}🔄 context 변경 감지 → /next 자동 실행${rst}\n"
-            _do_next
-            last_mtime=$(_auto_get_mtime)
-          else
-            last_mtime="$settled_mtime"
-          fi
+        else
+          last_mtime="$settled_mtime"
         fi
       fi
     done
   ) &
   _auto_pid=$!
-  printf "  ${grn}${bld}✔ /auto 시작${rst} ${dm}(context+pane AND 감지 모드, settle=${settle}s)${rst}\n"
+  printf "  ${grn}${bld}✔ /auto 시작${rst} ${dm}(context 변경 감지 모드, settle=${settle}s)${rst}\n"
 }
 
 _auto_stop() {
