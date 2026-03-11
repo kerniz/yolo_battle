@@ -1386,7 +1386,7 @@ _auto_get_mtime() {
 }
 
 _auto_start() {
-  local settle="${1:-15}"
+  local settle="${1:-10}"
   _auto_stop 2>/dev/null
   (
     local last_mtime=$(_auto_get_mtime)
@@ -1473,8 +1473,7 @@ _auto_stop() {
 # AUTO-NEXT: auto-start in sequential mode
 # ════════════════════════════════════════
 if [[ "$mode" == "sequential" ]]; then
-  _auto_start 15
-  printf "  ${cyn}${bld}🔄 /auto 자동 활성화 (순차모드, settle=15s)${rst}\n"
+  printf "  ${dm}💡 /auto 로 자동 릴레이 활성화 (기본 settle=10s)${rst}\n"
 fi
 
 # ════════════════════════════════════════
@@ -1603,7 +1602,7 @@ while true; do
       elif [[ "$auto_args" =~ ^[0-9]+$ ]]; then
         _auto_start "$auto_args"
       elif [[ -z "$auto_args" ]]; then
-        _auto_start 15
+        _auto_start 10
       else
         printf "  ${dm}사용법: /auto [settle초] | /auto stop${rst}\n"
       fi
