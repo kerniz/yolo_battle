@@ -121,7 +121,136 @@ _yolo_battle() {
     return 1
   }
 
+  # ── interactive agent selection ──
   local cnt=${#_yolo_opts[@]}
+  if [ $cnt -ge 2 ] && [ -t 0 ]; then
+    local -a _agent_selected
+    for ((j=1; j<=$cnt; j++)); do _agent_selected+=("1"); done
+    local ai=0
+    local akey
+    local cursor_up=$'\033[A'
+    local cursor_down=$'\033[B'
+    local bg_sel=$'\033[48;5;236m'
+
+    printf "\033[?25l"
+    trap 'printf "\033[?25h"' INT
+
+    local _agent_header_lines=5
+    local _agent_footer_lines=1
+
+    printf "\n"
+    printf "  ${purple}${bold}╔══════════════════════════════════════╗${reset}\n"
+    printf "  ${purple}${bold}║${reset}  ${cyan}${bold}🎯  참가 AI 선택${reset}                    ${purple}${bold}║${reset}\n"
+    printf "  ${purple}${bold}║${reset}  ${dim}Space: 토글  ⏎: 확인${reset}                ${purple}${bold}║${reset}\n"
+    printf "  ${purple}${bold}╠══════════════════════════════════════╣${reset}\n"
+    for ((aj=1; aj<=$cnt; aj++)); do
+      local chk="${green}✔${reset}"
+      if [ $((aj-1)) -eq "$ai" ]; then
+        printf "  ${purple}${bold}║${reset} ${bg_sel} ${tcolors[$aj]}${bold} ▸ [${chk}${bg_sel}${tcolors[$aj]}${bold}] ${_yolo_icons[$aj]}  %-18s${reset}${bg_sel}  ${reset}${purple}${bold}║${reset}\n" "${(U)_yolo_opts[$aj]}"
+      else
+        printf "  ${purple}${bold}║${reset}     ${dim}[${chk}${dim}] ${_yolo_icons[$aj]}  %-18s${reset}    ${purple}${bold}║${reset}\n" "${_yolo_opts[$aj]}"
+      fi
+    done
+    printf "  ${purple}${bold}╚══════════════════════════════════════╝${reset}\n"
+
+    while true; do
+      read -rs -k1 akey
+      if [[ "$akey" == $'\033' ]]; then
+        read -rs -k2 akey
+        akey=$'\033'"$akey"
+      fi
+
+      case "$akey" in
+        "$cursor_up")
+          ai=$(( (ai - 1 + cnt) % cnt ))
+          ;;
+        "$cursor_down")
+          ai=$(( (ai + 1) % cnt ))
+          ;;
+        " ")
+          local idx=$((ai+1))
+          if [ "${_agent_selected[$idx]}" = "1" ]; then
+            _agent_selected[$idx]="0"
+          else
+            _agent_selected[$idx]="1"
+          fi
+          ;;
+        $'\n')
+          local _sel_cnt=0
+          for ((aj=1; aj<=$cnt; aj++)); do
+            [ "${_agent_selected[$aj]}" = "1" ] && _sel_cnt=$((_sel_cnt+1))
+          done
+          if [ $_sel_cnt -lt 2 ]; then
+            printf "\033[$(($cnt + $_agent_footer_lines))A"
+            for ((aj=1; aj<=$cnt; aj++)); do
+              local chk=" "
+              [ "${_agent_selected[$aj]}" = "1" ] && chk="${green}✔${reset}"
+              if [ $((aj-1)) -eq "$ai" ]; then
+                printf "\r  ${purple}${bold}║${reset} ${bg_sel} ${tcolors[$aj]}${bold} ▸ [${chk}${bg_sel}${tcolors[$aj]}${bold}] ${_yolo_icons[$aj]}  %-18s${reset}${bg_sel}  ${reset}${purple}${bold}║${reset}\n" "${(U)_yolo_opts[$aj]}"
+              else
+                printf "\r  ${purple}${bold}║${reset}     ${dim}[${chk}${dim}] ${_yolo_icons[$aj]}  %-18s${reset}    ${purple}${bold}║${reset}\n" "${_yolo_opts[$aj]}"
+              fi
+            done
+            printf "\r  ${purple}${bold}╚══════════════════════════════════════╝${reset}\n"
+            printf "  ${red}${bold}  ⚠  최소 2개 이상 선택하세요${reset}\033[K"
+            sleep 1
+            printf "\r\033[K\033[1A\033[K"
+            printf "\r  ${purple}${bold}╚══════════════════════════════════════╝${reset}"
+            printf "\033[$(($cnt + $_agent_footer_lines))A"
+            continue
+          fi
+          break
+          ;;
+        *)
+          continue
+          ;;
+      esac
+
+      # redraw items + footer
+      printf "\033[$(($cnt + $_agent_footer_lines))A"
+      for ((aj=1; aj<=$cnt; aj++)); do
+        local chk=" "
+        [ "${_agent_selected[$aj]}" = "1" ] && chk="${green}✔${reset}"
+        if [ $((aj-1)) -eq "$ai" ]; then
+          printf "\r  ${purple}${bold}║${reset} ${bg_sel} ${tcolors[$aj]}${bold} ▸ [${chk}${bg_sel}${tcolors[$aj]}${bold}] ${_yolo_icons[$aj]}  %-18s${reset}${bg_sel}  ${reset}${purple}${bold}║${reset}\n" "${(U)_yolo_opts[$aj]}"
+        else
+          printf "\r  ${purple}${bold}║${reset}     ${dim}[${chk}${dim}] ${_yolo_icons[$aj]}  %-18s${reset}    ${purple}${bold}║${reset}\n" "${_yolo_opts[$aj]}"
+        fi
+      done
+      printf "\033[${_agent_footer_lines}B"
+    done
+
+    # clear agent selection UI
+    local _total_agent_lines=$((_agent_header_lines + cnt + _agent_footer_lines))
+    printf "\033[${_total_agent_lines}A\033[J"
+
+    # filter arrays to only selected agents
+    local -a _new_opts _new_icons _new_colors
+    for ((aj=1; aj<=$cnt; aj++)); do
+      if [ "${_agent_selected[$aj]}" = "1" ]; then
+        _new_opts+=("${_yolo_opts[$aj]}")
+        _new_icons+=("${_yolo_icons[$aj]}")
+        _new_colors+=("${tcolors[$aj]}")
+      fi
+    done
+    _yolo_opts=("${_new_opts[@]}")
+    _yolo_icons=("${_new_icons[@]}")
+    tcolors=("${_new_colors[@]}")
+    cnt=${#_yolo_opts[@]}
+
+    # show selected agents
+    printf "\n"
+    printf "  ${cyan}${bold}🎯 참가 AI:${reset} "
+    for ((aj=1; aj<=$cnt; aj++)); do
+      [ $aj -gt 1 ] && printf " ${dim}|${reset} "
+      printf "${_new_colors[$aj]}${_new_icons[$aj]} ${_new_opts[$aj]}${reset}"
+    done
+    printf "\n\n"
+
+    printf "\033[?25h"
+    trap - INT
+  fi
+
   if [ $cnt -lt 2 ]; then
     printf "${red}${bold} ✖  Need at least 2 CLIs for battle${reset}\n"
     return 1
@@ -133,6 +262,10 @@ _yolo_battle() {
   local savedir="$HOME/yolo-results/$(date +%Y%m%d-%H%M%S)"
   local workdir="$(pwd)"
 
+  # set default guideline when no prompt given
+  if [ -z "$prompt" ]; then
+    prompt="사용자의 지시를 대기하세요. 스스로 판단해서 코드를 수정하거나 파일을 변경하지 마세요. 공유 컨텍스트 파일에 사용자 지시가 있으면 그것을 따르고, 아무것도 없으면 사용자가 구체적인 작업을 요청할 때까지 대기하세요."
+  fi
   printf '%s' "$prompt" > "$tmpdir/prompt.txt"
   printf '%s' "$mode" > "$tmpdir/mode.txt"
   printf '%s' "$workdir" > "$tmpdir/workdir.txt"
@@ -1201,27 +1334,63 @@ while true; do
       printf "\n"
       ;;
     /cat\ *)
-      ... (existing code) ...
+      local filename="${input#/cat }"
+      if [ -z "$filename" ]; then
+        printf "  ${red}사용법: /cat FILE${rst}\n"
+      else
+        printf "\n  ${cyn}${bld}📄 파일 내용: ${filename}${rst}\n"
+        if [[ "$mode" == "collaborative" ]]; then
+          for ((ci=1; ci<=${#_cmd_tools[@]}; ci++)); do
+            local cname="${_cmd_tools[$ci]}"
+            local cicon="${_cmd_icons[$ci]}"
+            local cfile="$tmpdir/work_${cname}/${filename}"
+            printf "  ${cyn}${bld}${cicon} ${cname}${rst}\n"
+            if [ -f "$cfile" ]; then
+              head -30 "$cfile" | while IFS= read -r line; do
+                printf "    ${dm}%s${rst}\n" "$line"
+              done
+              local total_l=$(wc -l < "$cfile" | tr -d ' ')
+              [ "$total_l" -gt 30 ] && printf "    ${dm}... (총 ${total_l}줄)${rst}\n"
+            else
+              printf "    ${dm}(파일 없음)${rst}\n"
+            fi
+            printf "\n"
+          done
+        else
+          local cfile="${workdir}/${filename}"
+          if [ -f "$cfile" ]; then
+            head -50 "$cfile" | while IFS= read -r line; do
+              printf "    ${dm}%s${rst}\n" "$line"
+            done
+            local total_l=$(wc -l < "$cfile" | tr -d ' ')
+            [ "$total_l" -gt 50 ] && printf "    ${dm}... (총 ${total_l}줄)${rst}\n"
+          else
+            printf "    ${red}(파일 없음: ${cfile})${rst}\n"
+          fi
+          printf "\n"
+        fi
+      fi
       ;;
     /grep\ *)
       local pattern="${input#/grep }"
-      printf "\n  ${cyn}${bld}🔍 검색:${rst} ${pattern}\n"
-      for ((ci=1; ci<=${#_cmd_tools[@]}; ci++)); do
-        local cname="${_cmd_tools[$ci]}"
-        local cicon="${_cmd_icons[$ci]}"
-        local cworkdir=""
-        if [[ "$mode" == "collaborative" ]]; then
-          cworkdir="$tmpdir/work_${cname}"
-        else
-          cworkdir="$workdir"
-        fi
-        printf "  ${cyn}${bld}${cicon} ${cname}${rst}\n"
-        grep -rnI --color=always "$pattern" "$cworkdir" 2>/dev/null | head -10 | while IFS= read -r line; do
-          # Strip workdir prefix for cleaner output
-          printf "    ${dm}%s${rst}\n" "${line#$cworkdir/}"
+      printf "\n  ${cyn}${bld}🔍 검색: ${pattern}${rst}\n"
+      if [[ "$mode" == "collaborative" ]]; then
+        for ((ci=1; ci<=${#_cmd_tools[@]}; ci++)); do
+          local cname="${_cmd_tools[$ci]}"
+          local cicon="${_cmd_icons[$ci]}"
+          local cworkdir="$tmpdir/work_${cname}"
+          printf "  ${cyn}${bld}${cicon} ${cname}${rst}\n"
+          grep -rnI --color=always "$pattern" "$cworkdir" 2>/dev/null | head -10 | while IFS= read -r line; do
+            printf "    ${dm}%s${rst}\n" "${line#$cworkdir/}"
+          done
+          printf "\n"
+        done
+      else
+        grep -rnI --color=always "$pattern" "$workdir" 2>/dev/null | head -20 | while IFS= read -r line; do
+          printf "  ${dm}%s${rst}\n" "${line#$workdir/}"
         done
         printf "\n"
-      done
+      fi
       ;;
     /save)
       _do_save
@@ -1394,14 +1563,20 @@ CMD_BODY
   local _cmd_pane_id
 
   if [ $cnt -eq 2 ]; then
+    # 2x2 grid layout:
+    # ┌──────┬──────┐
+    # │ AI 1 │ AI 2 │
+    # ├──────┼──────┤
+    # │ CMD  │GUIDE │
+    # └──────┴──────┘
     sed -i '' 's/has_help_pane=false/has_help_pane=true/' "$cmd_script"
     tmux new-session -d -s "$session" "zsh ${_battle_scripts[1]}"
     _ai_pane_ids[1]=$(tmux display-message -t "${session}" -p '#{pane_id}')
-    tmux split-window -v -t "${_ai_pane_ids[1]}" -p 30 "zsh ${cmd_script}"
-    _cmd_pane_id=$(tmux display-message -t "${session}" -p '#{pane_id}')
     tmux split-window -h -t "${_ai_pane_ids[1]}" -p 50 "zsh ${_battle_scripts[2]}"
     _ai_pane_ids[2]=$(tmux display-message -t "${session}" -p '#{pane_id}')
-    tmux split-window -h -t "${_cmd_pane_id}" -p 45 "zsh ${help_script}"
+    tmux split-window -v -t "${_ai_pane_ids[1]}" -p 50 "zsh ${cmd_script}"
+    _cmd_pane_id=$(tmux display-message -t "${session}" -p '#{pane_id}')
+    tmux split-window -v -t "${_ai_pane_ids[2]}" -p 50 "zsh ${help_script}"
     local _help_pane_id=$(tmux display-message -t "${session}" -p '#{pane_id}')
     echo "${_ai_pane_ids[1]} ${_ai_pane_ids[2]}" > "$tmpdir/ai_panes.txt"
     tmux select-pane -t "${_ai_pane_ids[1]}" -T "${_yolo_icons[1]} ${(U)_yolo_opts[1]}"
