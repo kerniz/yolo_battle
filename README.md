@@ -22,7 +22,7 @@ Multi-agent AI battle system for your terminal. Run Claude, Gemini, and Codex si
 - **tmux** (`brew install tmux`)
 - At least **2** of the following AI CLIs:
   - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) — `npm install -g @anthropic-ai/claude-code`
-  - [Gemini CLI](https://github.com/google-gemini/gemini-cli) — `npm install -g @anthropic-ai/claude-code`
+  - [Gemini CLI](https://github.com/google-gemini/gemini-cli) — `npm install -g @google/gemini-cli`
   - [Codex CLI](https://github.com/openai/codex) — `npm install -g @openai/codex`
 
 ## Install

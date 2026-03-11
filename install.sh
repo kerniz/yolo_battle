@@ -59,6 +59,8 @@ mkdir -p "$YOLO_DIR"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cp "$SCRIPT_DIR/yolo.zsh" "$YOLO_DIR/yolo.zsh"
 cp "$SCRIPT_DIR/battle.zsh" "$YOLO_DIR/battle.zsh"
+mkdir -p "$YOLO_DIR/modes"
+cp "$SCRIPT_DIR/modes/"*.zsh "$YOLO_DIR/modes/" 2>/dev/null
 chmod +x "$YOLO_DIR/yolo.zsh" "$YOLO_DIR/battle.zsh"
 
 printf "  ${GREEN}${BOLD}✔${RESET} Files installed\n\n"
