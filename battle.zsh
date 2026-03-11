@@ -1,9 +1,9 @@
 #!/bin/zsh
 # yolo battle - multi-agent battle mode
 # Usage: yolo battle [-p|-s|-c] "prompt"
-#   -p  parallel  (동시)   : broadcast same message to all AIs (chat/planning)
-#   -s  sequential(순차)   : relay chain, each AI builds on previous (끝말잇기)
-#   -c  collaborative(협동): split roles + git worktree isolation, no file conflicts (co-op) (default)
+#   -p  parallel  (동시)   : 각 AI 독립 컨텍스트, 서로 열람 가능, 사용자가 최종 선택
+#   -s  sequential(순차)   : 1개 컨텍스트 릴레이, /next로 라운드로빈 무한순환
+#   -c  collaborative(협동): 역할분리 + 3개 작업컨텍스트 + 1개 공유보드, worktree 격리
 
 _yolo_battle() {
   # Receive context from parent yolo function via these globals:
@@ -46,15 +46,47 @@ _yolo_battle() {
   git -C "$workdir" diff HEAD --stat > "$tmpdir/git_baseline.txt" 2>/dev/null
   git -C "$workdir" rev-parse HEAD > "$tmpdir/git_head.txt" 2>/dev/null
 
+  # ── context files per mode ──
+  echo "1" > "$tmpdir/round.txt"
+  git -C "$workdir" rev-parse HEAD > "$tmpdir/git_head_track.txt" 2>/dev/null
+
+  case "$mode" in
+    sequential)
+      # 1개 공유 컨텍스트
+      echo "# Sequential Mode Context (릴레이)" > "$tmpdir/context.md"
+      echo "" >> "$tmpdir/context.md"
+      ;;
+    parallel)
+      # 3개 독립 컨텍스트
+      for ((j=1; j<=$cnt; j++)); do
+        local tname="${_yolo_opts[$j]}"
+        echo "# ${tname} Context" > "$tmpdir/context_${tname}.md"
+        echo "" >> "$tmpdir/context_${tname}.md"
+      done
+      ;;
+    collaborative)
+      # 3개 작업 컨텍스트 + 1개 공유 보드
+      for ((j=1; j<=$cnt; j++)); do
+        local tname="${_yolo_opts[$j]}"
+        echo "# ${tname} Work Context" > "$tmpdir/context_${tname}.md"
+        echo "" >> "$tmpdir/context_${tname}.md"
+      done
+      echo "# Shared Board (공유 보드)" > "$tmpdir/shared.md"
+      echo "" >> "$tmpdir/shared.md"
+      echo "각 AI가 현재 작업 내용을 여기에 기록합니다." >> "$tmpdir/shared.md"
+      echo "" >> "$tmpdir/shared.md"
+      ;;
+  esac
+
   local _is_restart=false
   while true; do
   # ── reset mode-dependent state for restart ──
   printf '%s' "$mode" > "$tmpdir/mode.txt"
   echo "0" > "$tmpdir/seq_turn.txt"
-  rm -f "$tmpdir/seq_order_map.txt" "$tmpdir/run_"*.sh "$tmpdir/cmd_center.sh" "$tmpdir/monitor.sh" "$tmpdir/ai_panes.txt"
-  rm -f "$tmpdir/status_"* "$tmpdir/diff_"*
+  rm -f "$tmpdir/seq_order_map.txt" "$tmpdir"/run_*.sh(N) "$tmpdir/cmd_center.sh" "$tmpdir/monitor.sh" "$tmpdir/ai_panes.txt"
+  rm -f "$tmpdir"/status_*(N) "$tmpdir"/diff_*(N)
   # cleanup previous worktrees on restart
-  for _wt in "$tmpdir"/work_*; do
+  for _wt in "$tmpdir"/work_*(N); do
     [ -d "$_wt" ] && git -C "$workdir" worktree remove "$_wt" 2>/dev/null
   done
   for _br in $(git -C "$workdir" branch --list "battle-coop-*" 2>/dev/null); do
@@ -66,9 +98,9 @@ _yolo_battle() {
   _roles=("Core" "Tests" "Config")
   if [ -n "$prompt" ]; then
     _role_prompts=(
-      "You are the core developer. Focus ONLY on main implementation/source code. Do NOT create or modify test files, config files, or documentation. Task: ${prompt}"
-      "You are the test engineer. Write tests and test utilities ONLY. Do NOT modify any implementation/source code. Only create/edit files in test directories or files with test/spec in their name. Task: ${prompt}"
-      "You are the DevOps/config engineer. Handle ONLY build config, documentation, CI/CD, and infrastructure files. Do NOT modify implementation code or test files. Task: ${prompt}"
+      "You are the core developer. Focus ONLY on main implementation/source code. Do NOT create or modify test files, config files, or documentation. After completing work, write a summary of what you did to the shared board: ${tmpdir}/shared.md (append, don't overwrite). Task: ${prompt}"
+      "You are the test engineer. Write tests and test utilities ONLY. Do NOT modify any implementation/source code. Only create/edit files in test directories or files with test/spec in their name. After completing work, write a summary of what you did to the shared board: ${tmpdir}/shared.md (append, don't overwrite). Check the shared board to see what other AIs are doing to avoid duplication. Task: ${prompt}"
+      "You are the DevOps/config engineer. Handle ONLY build config, documentation, CI/CD, and infrastructure files. Do NOT modify implementation code or test files. After completing work, write a summary of what you did to the shared board: ${tmpdir}/shared.md (append, don't overwrite). Check the shared board to see what other AIs are doing to avoid duplication. Task: ${prompt}"
     )
   fi
 
@@ -127,8 +159,6 @@ _yolo_battle() {
   fi
 
   # write order to file for scripts to read
-  # seq_order_map: maps tool index → its turn number
-  # e.g., order "2 1 3" means tool2=turn1, tool1=turn2, tool3=turn3
   for ((j=1; j<=${#_seq_order[@]}; j++)); do
     local oidx=${_seq_order[$j]}
     echo "$oidx:$j" >> "$tmpdir/seq_order_map.txt"
@@ -192,77 +222,60 @@ B
         ;;
       esac
 
-      # collaborative mode: inject role variable early (needed by WAIT_LOGIC)
+      # collaborative mode: inject role variable early
       if [[ "$mode" == "collaborative" ]]; then
         echo "collab_role=\"${_roles[$j]:-Developer}\""
         echo "collab_dev_tool=\"${_yolo_opts[1]}\""
       fi
 
-      # mode-specific behavior
+      # mode-specific info display
       cat << 'WAIT_LOGIC'
-# ── sequential mode: wait for turn ──
+# ── mode info ──
 if [[ "$mode" == "sequential" ]]; then
-  # find my turn number from order map
   my_turn=""
   while IFS=: read -r tidx tnum; do
     [ "$tidx" = "$toolidx" ] && my_turn="$tnum"
   done < "$tmpdir/seq_order_map.txt"
   [ -z "$my_turn" ] && my_turn="$toolidx"
-
-  echo "waiting" > "$statusfile"
-  printf '  \033[2m⏳ Waiting for turn (#%s)...\033[0m\n' "$my_turn"
-  while true; do
-    local turn=$(cat "$tmpdir/seq_turn.txt" 2>/dev/null)
-    [ "$turn" = "$my_turn" ] && break
-    sleep 0.5
-  done
-  printf '  \033[38;5;220m\033[1m▶ Your turn!\033[0m\n\n'
-
-  # ── inject previous AI's changes as context ──
-  prev_diff_file="$tmpdir/diff_turn_$((my_turn - 1)).txt"
-  if [ -f "$prev_diff_file" ] && [ -s "$prev_diff_file" ]; then
-    printf '  \033[38;5;51m\033[1m📋 Previous AI changes:\033[0m\n'
-    printf '  \033[2m%.60s...\033[0m\n' "$(head -1 "$prev_diff_file")"
-    printf '  \033[2m(%d lines of diff)\033[0m\n\n' "$(wc -l < "$prev_diff_file")"
-  fi
+  printf '  \033[2m📋 순차 모드 - 턴 #%s (공유 컨텍스트: %s/context.md)\033[0m\n' "$my_turn" "$tmpdir"
+elif [[ "$mode" == "parallel" ]]; then
+  printf '  \033[2m📋 동시 모드 - 내 컨텍스트: %s/context_%s.md\033[0m\n' "$tmpdir" "$toolname"
+  printf '  \033[2m   다른 AI 컨텍스트도 열람 가능 (context_*.md)\033[0m\n'
+elif [[ "$mode" == "collaborative" ]]; then
+  printf '  \033[2m📋 협동 모드 - 내 컨텍스트: %s/context_%s.md\033[0m\n' "$tmpdir" "$toolname"
+  printf '  \033[2m   공유 보드: %s/shared.md (작업 내용 기록 + 확인)\033[0m\n' "$tmpdir"
 fi
-
-# ── collaborative mode: all roles run simultaneously ──
 WAIT_LOGIC
 
       # determine prompt based on mode
       echo 'prompt=$(cat "$tmpdir/prompt.txt")'
       echo ""
 
-      # collaborative mode: set role prompt (before context inject so context appends to role prompt)
+      # mode-specific context path injection into prompt
+      case "$mode" in
+        sequential)
+          echo 'prompt="[공유 컨텍스트: '"$tmpdir"'/context.md - 이전 AI 작업 내용이 누적됩니다] ${prompt}"'
+          ;;
+        parallel)
+          echo 'prompt="[내 컨텍스트: '"$tmpdir"'/context_${toolname}.md | 다른 AI 컨텍스트: '"$tmpdir"'/context_*.md 열람 가능] ${prompt}"'
+          ;;
+        collaborative)
+          echo 'prompt="[내 작업 컨텍스트: '"$tmpdir"'/context_${toolname}.md | 공유 보드: '"$tmpdir"'/shared.md - 작업 내용을 기록하고 다른 AI 작업을 확인하세요] ${prompt}"'
+          ;;
+      esac
+      echo ""
+
+      # collaborative mode: set role prompt
       if [[ "$mode" == "collaborative" ]]; then
         local role="${_roles[$j]:-Developer}"
         local rprompt="${_role_prompts[$j]}"
         echo "role=\"$role\""
         echo "printf '  \\033[38;5;220m\\033[1m📋 Role: ${role}\\033[0m\\n\\n'"
         if [ -n "$rprompt" ]; then
-          # Write role prompt to a file to avoid quoting issues
           printf '%s' "$rprompt" > "$tmpdir/role_prompt_${tname}.txt"
           echo "prompt=\$(cat \"$tmpdir/role_prompt_${tname}.txt\")"
         fi
       fi
-
-      # inject previous changes into prompt for sequential/collaborative mode
-      cat << 'CONTEXT_INJECT'
-if [[ "$mode" == "sequential" ]] && [ -n "$my_turn" ] && [ "$my_turn" -gt 1 ]; then
-  prev_diff="$tmpdir/diff_turn_$((my_turn - 1)).txt"
-  if [ -f "$prev_diff" ] && [ -s "$prev_diff" ]; then
-    ctx=$(cat "$prev_diff")
-    # truncate if too long (keep first 200 lines)
-    if [ $(echo "$ctx" | wc -l) -gt 200 ]; then
-      ctx="$(echo "$ctx" | head -200)"$'\n... (truncated)'
-    fi
-    prompt="${prompt}"$'\n\n'"[Context: Changes made by previous AI]"$'\n'"${ctx}"
-  fi
-fi
-
-# collaborative mode: roles run simultaneously, no diff injection needed
-CONTEXT_INJECT
 
       # mark as running + record start time + save git HEAD for diff tracking
       echo 'echo "running" > "$statusfile"'
@@ -288,7 +301,7 @@ else
 fi
 RUN_TOOL
 
-      # mark as done + capture diff + auto-commit
+      # mark as done + capture diff + auto-commit (AI process exited)
       cat << 'DONE_LOGIC'
 
 _elapsed=$(( SECONDS - _start_ts ))
@@ -317,7 +330,7 @@ Tool: ${toolname}" 2>/dev/null
   fi
 fi
 
-# diff from pre-head captures ALL changes (AI's own commits + auto-commit above)
+# diff from pre-head captures ALL changes
 _diff=""
 _diff_stat=""
 if [ -n "$_pre_head" ]; then
@@ -326,13 +339,7 @@ if [ -n "$_pre_head" ]; then
 fi
 
 if [ -n "$_diff" ]; then
-  # save diff for next AI's context (끝말잇기: chain context to next AI)
-  if [[ "$mode" == "sequential" ]] && [ -n "$my_turn" ]; then
-    echo "$_diff" > "$tmpdir/diff_turn_${my_turn}.txt"
-  fi
-  # save diff by tool name (for collaborative mode review)
   echo "$_diff" > "$tmpdir/diff_${toolname}.txt"
-
   printf '\n  \033[38;5;51m\033[1m📊 Changes:\033[0m\n'
   echo "$_diff_stat" | while IFS= read -r line; do
     printf '  \033[2m  %s\033[0m\n' "$line"
@@ -341,15 +348,19 @@ else
   printf '\n  \033[2m  (no changes detected)\033[0m\n'
 fi
 
-# sequential mode: auto-advance to next turn
-if [[ "$mode" == "sequential" ]] && [ -n "$my_turn" ]; then
-  next_turn=$(( my_turn + 1 ))
-  echo "$next_turn" > "$tmpdir/seq_turn.txt"
-  printf '\n  \033[38;5;220m\033[1m▶ 다음 턴 (#%s) 자동 시작\033[0m\n' "$next_turn"
+# save final output to own context file (for parallel/collaborative modes)
+if [[ "$mode" == "parallel" ]] || [[ "$mode" == "collaborative" ]]; then
+  {
+    echo ""
+    echo "## Final Output (process exited)"
+    echo "### Changes"
+    echo '```'
+    [ -n "$_diff_stat" ] && echo "$_diff_stat" || echo "(none)"
+    echo '```'
+  } >> "$tmpdir/context_${toolname}.md"
 fi
 
-printf '\n  \033[2m[완료] 아무 키나 누르세요...\033[0m'
-read -rs -k1
+printf '\n  \033[2m[AI 프로세스 종료됨]\033[0m\n'
 DONE_LOGIC
     } > "$script"
     chmod +x "$script"
@@ -425,17 +436,25 @@ DONE_LOGIC
     echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/status${rst}   각 AI 상태 확인   ${prp}${bld}║${rst}\n"'
     echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/diff${rst}     변경사항 확인     ${prp}${bld}║${rst}\n"'
     echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/save${rst}     결과 저장         ${prp}${bld}║${rst}\n"'
+    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/ctx${rst}      컨텍스트 확인     ${prp}${bld}║${rst}\n"'
     echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/prompt X${rst} 프롬프트 변경     ${prp}${bld}║${rst}\n"'
     echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/focus N${rst}  N번 pane 포커스   ${prp}${bld}║${rst}\n"'
 
     if [[ "$mode" == "sequential" ]]; then
-      echo 'printf "  ${prp}${bld}║${rst}  ${ylw}${bld}/next X${rst}   다음+프롬프트${cyn}★${rst} ${prp}${bld}║${rst}\n"'
-      echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/skip${rst}     현재 AI 건너뛰기${prp}${bld}║${rst}\n"'
+      echo 'printf "  ${prp}${bld}║${rst}  ${ylw}${bld}/next X${rst}   라운드로빈${cyn}★${rst}    ${prp}${bld}║${rst}\n"'
+      echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/skip${rst}     건너뛰기         ${prp}${bld}║${rst}\n"'
       echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/order N${rst}  순서 변경       ${prp}${bld}║${rst}\n"'
+      echo 'printf "  ${prp}${bld}║${rst}  ${dm}  1→2→3→1→... 무한순환${rst}   ${prp}${bld}║${rst}\n"'
+    fi
+
+    if [[ "$mode" == "parallel" ]]; then
+      echo 'printf "  ${prp}${bld}║${rst}  ${ylw}${bld}/pick N${rst}  N번 AI 채택${cyn}★${rst}  ${prp}${bld}║${rst}\n"'
+      echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/compare${rst}  3개 결과 비교   ${prp}${bld}║${rst}\n"'
     fi
 
     if [[ "$mode" == "collaborative" ]]; then
       echo 'printf "  ${prp}${bld}║${rst}  ${ylw}${bld}/merge${rst}   브랜치 머지 ${cyn}★${rst}  ${prp}${bld}║${rst}\n"'
+      echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/board${rst}    공유보드 확인    ${prp}${bld}║${rst}\n"'
       echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/swap N M${rst} 역할 교체       ${prp}${bld}║${rst}\n"'
       echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/role N X${rst} 역할 변경       ${prp}${bld}║${rst}\n"'
       echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/roles${rst}    역할 확인        ${prp}${bld}║${rst}\n"'
@@ -468,6 +487,15 @@ DONE_LOGIC
         local oi=${_seq_order[$j]}
         echo "printf '   ${j}) ${_yolo_icons[$oi]} ${_yolo_opts[$oi]}\n'"
       done
+    fi
+
+    # parallel mode: context info
+    if [[ "$mode" == "parallel" ]]; then
+      echo 'printf "\n  ${ylw}${bld}📋 컨텍스트:${rst}\n"'
+      for ((j=1; j<=$cnt; j++)); do
+        echo "printf '   ${_yolo_icons[$j]} ${_yolo_opts[$j]}: context_${_yolo_opts[$j]}.md\n'"
+      done
+      echo "printf '  ${dm}/pick N 으로 최종 채택${rst}\n'"
     fi
 
     echo ''
@@ -544,39 +572,54 @@ else
   case "$mode" in
     parallel)
       printf "  ${prp}${bld}║${rst}  ${ylw}${bld}⚡ PARALLEL${rst} ${dm}동시 모드${rst}             ${prp}${bld}║${rst}\n"
-      printf "  ${prp}${bld}║${rst}  ${dm}입력 → 모든 AI에 동시 전송${rst}         ${prp}${bld}║${rst}\n"
+      printf "  ${prp}${bld}║${rst}  ${dm}각자 독립 작업 → /pick N 채택${rst}      ${prp}${bld}║${rst}\n"
       ;;
     sequential)
       printf "  ${prp}${bld}║${rst}  ${cyn}${bld}➡️  SEQUENTIAL${rst} ${dm}순차 모드${rst}          ${prp}${bld}║${rst}\n"
-      printf "  ${prp}${bld}║${rst}  ${dm}끝말잇기: 이전 결과 이어받기${rst}       ${prp}${bld}║${rst}\n"
+      printf "  ${prp}${bld}║${rst}  ${dm}1개 컨텍스트 릴레이 /next 순환${rst}     ${prp}${bld}║${rst}\n"
       ;;
     collaborative)
       printf "  ${prp}${bld}║${rst}  ${grn}${bld}🤝 CO-OP${rst} ${dm}협동 모드${rst}                ${prp}${bld}║${rst}\n"
-      printf "  ${prp}${bld}║${rst}  ${dm}역할분리 + worktree 격리${rst}           ${prp}${bld}║${rst}\n"
+      printf "  ${prp}${bld}║${rst}  ${dm}역할분리 + 공유보드 + worktree${rst}     ${prp}${bld}║${rst}\n"
       ;;
   esac
 
   printf "  ${prp}${bld}╠══════════════════════════════════════╣${rst}\n"
-  printf "  ${prp}${bld}║${rst}  ${cyn}명령어:${rst}                            ${prp}${bld}║${rst}\n"
+  printf "  ${prp}${bld}║${rst}  ${cyn}공통 명령어:${rst}                        ${prp}${bld}║${rst}\n"
   printf "  ${prp}${bld}║${rst}   ${ylw}/status${rst}    각 AI 상태 확인        ${prp}${bld}║${rst}\n"
   printf "  ${prp}${bld}║${rst}   ${ylw}/diff${rst}      각 AI 변경사항 확인   ${prp}${bld}║${rst}\n"
   printf "  ${prp}${bld}║${rst}   ${ylw}/save${rst}      결과 저장              ${prp}${bld}║${rst}\n"
+  printf "  ${prp}${bld}║${rst}   ${ylw}/ctx${rst}       컨텍스트 확인          ${prp}${bld}║${rst}\n"
   printf "  ${prp}${bld}║${rst}   ${ylw}/prompt X${rst}  프롬프트 변경          ${prp}${bld}║${rst}\n"
   printf "  ${prp}${bld}║${rst}   ${ylw}/focus N${rst}   N번 pane 포커스        ${prp}${bld}║${rst}\n"
 
   if [[ "$mode" == "sequential" ]]; then
-    printf "  ${prp}${bld}║${rst}   ${ylw}${bld}/next X${rst}    다음+새프롬프트${cyn}★${rst}    ${prp}${bld}║${rst}\n"
-    printf "  ${prp}${bld}║${rst}   ${ylw}/skip${rst}      현재 AI 건너뛰기     ${prp}${bld}║${rst}\n"
+    printf "  ${prp}${bld}╠══════════════════════════════════════╣${rst}\n"
+    printf "  ${prp}${bld}║${rst}  ${cyn}순차 모드:${rst}                          ${prp}${bld}║${rst}\n"
+    printf "  ${prp}${bld}║${rst}   ${ylw}${bld}/next X${rst}    라운드로빈 ${cyn}★${rst}        ${prp}${bld}║${rst}\n"
+    printf "  ${prp}${bld}║${rst}   ${ylw}/skip${rst}      건너뛰기              ${prp}${bld}║${rst}\n"
     printf "  ${prp}${bld}║${rst}   ${ylw}/order N..${rst} 순서 변경 ${dm}(예:2 1 3)${rst}${prp}${bld}║${rst}\n"
+    printf "  ${prp}${bld}║${rst}   ${dm}  1→2→3→1→... 무한 라운드로빈${rst}  ${prp}${bld}║${rst}\n"
+  fi
+
+  if [[ "$mode" == "parallel" ]]; then
+    printf "  ${prp}${bld}╠══════════════════════════════════════╣${rst}\n"
+    printf "  ${prp}${bld}║${rst}  ${cyn}동시 모드:${rst}                          ${prp}${bld}║${rst}\n"
+    printf "  ${prp}${bld}║${rst}   ${ylw}${bld}/pick N${rst}   N번 AI 결과 채택 ${cyn}★${rst}  ${prp}${bld}║${rst}\n"
+    printf "  ${prp}${bld}║${rst}   ${ylw}/compare${rst}   3개 결과 비교         ${prp}${bld}║${rst}\n"
   fi
 
   if [[ "$mode" == "collaborative" ]]; then
+    printf "  ${prp}${bld}╠══════════════════════════════════════╣${rst}\n"
+    printf "  ${prp}${bld}║${rst}  ${cyn}협동 모드:${rst}                          ${prp}${bld}║${rst}\n"
     printf "  ${prp}${bld}║${rst}   ${ylw}${bld}/merge${rst}    브랜치 머지 ${cyn}★${rst}        ${prp}${bld}║${rst}\n"
+    printf "  ${prp}${bld}║${rst}   ${ylw}/board${rst}     공유보드 확인          ${prp}${bld}║${rst}\n"
     printf "  ${prp}${bld}║${rst}   ${ylw}/swap N M${rst}  N↔M 역할 교체        ${prp}${bld}║${rst}\n"
     printf "  ${prp}${bld}║${rst}   ${ylw}/role N X${rst}  N번 AI 역할 변경     ${prp}${bld}║${rst}\n"
     printf "  ${prp}${bld}║${rst}   ${ylw}/roles${rst}     현재 역할 확인        ${prp}${bld}║${rst}\n"
   fi
 
+  printf "  ${prp}${bld}╠══════════════════════════════════════╣${rst}\n"
   printf "  ${prp}${bld}║${rst}   ${ylw}/mode X${rst}    모드 변경 ${dm}(p/s/c)${rst}   ${prp}${bld}║${rst}\n"
   printf "  ${prp}${bld}║${rst}   ${ylw}/help${rst}      도움말                ${prp}${bld}║${rst}\n"
   printf "  ${prp}${bld}║${rst}   ${ylw}/quit${rst}      세션 종료              ${prp}${bld}║${rst}\n"
@@ -588,7 +631,7 @@ else
   printf "  ${prp}${bld}║${rst}   ${ylw}Ctrl+B → d${rst}      세션 나가기       ${prp}${bld}║${rst}\n"
   printf "  ${prp}${bld}╚══════════════════════════════════════╝${rst}\n"
 
-  # collaborative mode: show roles
+  # mode-specific info
   if [[ "$mode" == "collaborative" ]]; then
     printf "\n  ${grn}${bld}📋 역할 배정:${rst}\n"
     for ((r=1; r<=${#_cmd_tools[@]}; r++)); do
@@ -596,21 +639,34 @@ else
     done
   fi
 
-  # sequential mode: show order (using custom order)
   if [[ "$mode" == "sequential" ]]; then
     printf "\n  ${cyn}${bld}📋 실행 순서:${rst}\n"
     for ((r=1; r<=${#_cmd_seq_order[@]}; r++)); do
       local oi=${_cmd_seq_order[$r]}
       printf "   ${dm}#${r}${rst} ${_cmd_icons[$oi]} ${_cmd_tools[$oi]}\n"
     done
-    printf "\n  ${ylw}${bld}▶ #1 자동 시작됨. /next로 다음 진행${rst}\n"
+    printf "\n  ${ylw}${bld}▶ 모든 AI 동시 시작. /next로 1→2→3→1→... 무한 순환${rst}\n"
+  fi
+
+  if [[ "$mode" == "parallel" ]]; then
+    printf "\n  ${ylw}${bld}📋 각 AI 독립 컨텍스트로 작업 중${rst}\n"
+    printf "  ${dm}완료 후 /compare로 비교, /pick N으로 채택${rst}\n"
   fi
 
   printf "\n"
 fi
 
+# ════════════════════════════════════════
+# FUNCTIONS
+# ════════════════════════════════════════
+
 _show_status() {
   printf "\n"
+  local round=$(cat "$tmpdir/round.txt" 2>/dev/null)
+  local cur_turn=$(cat "$tmpdir/seq_turn.txt" 2>/dev/null)
+  if [[ "$mode" == "sequential" ]]; then
+    printf "  ${cyn}${bld}라운드 ${round} / 턴 ${cur_turn}${rst}\n"
+  fi
   for ((si=1; si<=${#_cmd_tools[@]}; si++)); do
     local sname="${_cmd_tools[$si]}"
     local sicon="${_cmd_icons[$si]}"
@@ -638,11 +694,9 @@ _send_to_pane() {
   tmux send-keys -t "${pane}" -l "$text" 2>/dev/null
   case "$tool" in
     gemini)
-      # Gemini CLI needs multiple enters to submit
       tmux send-keys -t "${pane}" Enter Enter Enter 2>/dev/null
       ;;
     codex)
-      # Codex CLI needs double enter to submit
       tmux send-keys -t "${pane}" Enter Enter 2>/dev/null
       ;;
     *)
@@ -662,7 +716,6 @@ _show_diffs() {
       has_diff=true
       local dlines=$(wc -l < "$dfile" | tr -d ' ')
       printf "  ${cyn}${bld}${dicon} ${dname}${rst} ${dm}(${dlines} lines)${rst}\n"
-      # show colorized diff preview (first 20 lines)
       head -20 "$dfile" | while IFS= read -r dline; do
         case "$dline" in
           +*) printf "    ${grn}%s${rst}\n" "$dline" ;;
@@ -677,7 +730,6 @@ _show_diffs() {
       printf "  ${dm}${dicon} ${dname}: (변경 없음)${rst}\n"
     fi
   done
-  # also show current uncommitted changes
   local live_diff=$(git -C "$workdir" diff --stat 2>/dev/null)
   if [ -n "$live_diff" ]; then
     printf "  ${ylw}${bld}📊 현재 uncommitted 변경:${rst}\n"
@@ -693,24 +745,96 @@ _show_diffs() {
 
 _do_save() {
   mkdir -p "$savedir"
-  # capture each AI pane's output
   for ((si=0; si<${#ai_panes[@]}; si++)); do
     local pidx="${ai_panes[$((si+1))]}"
     local tname="${_cmd_tools[$((si+1))]}"
     tmux capture-pane -t "${pidx}" -p -S -500 > "$savedir/${tname}.txt" 2>/dev/null
   done
-  # save prompt
   cp "$tmpdir/prompt.txt" "$savedir/prompt.txt" 2>/dev/null
-  # save mode
   cp "$tmpdir/mode.txt" "$savedir/mode.txt" 2>/dev/null
+  # save context files
+  cp "$tmpdir"/context*.md(N) "$savedir/" 2>/dev/null
+  cp "$tmpdir"/shared.md "$savedir/" 2>/dev/null
   printf "  ${grn}${bld}✔ 저장됨:${rst} ${dm}${savedir}${rst}\n"
   printf "  ${dm}  파일: prompt.txt"
   for ((si=1; si<=${#_cmd_tools[@]}; si++)); do
     printf ", ${_cmd_tools[$si]}.txt"
   done
-  printf "${rst}\n\n"
+  printf ", context*.md${rst}\n\n"
 }
 
+# ════════════════════════════════════════
+# /ctx - 컨텍스트 확인
+# ════════════════════════════════════════
+_do_ctx() {
+  printf "\n"
+  case "$mode" in
+    sequential)
+      printf "  ${cyn}${bld}📋 공유 컨텍스트 (context.md):${rst}\n"
+      local ctx_file="$tmpdir/context.md"
+      if [ -f "$ctx_file" ] && [ -s "$ctx_file" ]; then
+        local ctx_lines=$(wc -l < "$ctx_file" | tr -d ' ')
+        tail -30 "$ctx_file" | while IFS= read -r cl; do
+          printf "    ${dm}%s${rst}\n" "$cl"
+        done
+        [ "$ctx_lines" -gt 30 ] && printf "    ${dm}... (총 ${ctx_lines}줄, 마지막 30줄 표시)${rst}\n"
+      else
+        printf "    ${dm}(비어 있음)${rst}\n"
+      fi
+      ;;
+    parallel)
+      for ((ci=1; ci<=${#_cmd_tools[@]}; ci++)); do
+        local cname="${_cmd_tools[$ci]}"
+        local cicon="${_cmd_icons[$ci]}"
+        local cfile="$tmpdir/context_${cname}.md"
+        printf "  ${cyn}${bld}${cicon} ${cname} 컨텍스트:${rst}\n"
+        if [ -f "$cfile" ] && [ -s "$cfile" ]; then
+          local cl=$(wc -l < "$cfile" | tr -d ' ')
+          tail -15 "$cfile" | while IFS= read -r line; do
+            printf "    ${dm}%s${rst}\n" "$line"
+          done
+          [ "$cl" -gt 15 ] && printf "    ${dm}... (총 ${cl}줄)${rst}\n"
+        else
+          printf "    ${dm}(비어 있음)${rst}\n"
+        fi
+        printf "\n"
+      done
+      ;;
+    collaborative)
+      printf "  ${grn}${bld}📋 공유 보드 (shared.md):${rst}\n"
+      local sfile="$tmpdir/shared.md"
+      if [ -f "$sfile" ] && [ -s "$sfile" ]; then
+        tail -20 "$sfile" | while IFS= read -r sl; do
+          printf "    ${dm}%s${rst}\n" "$sl"
+        done
+      else
+        printf "    ${dm}(비어 있음)${rst}\n"
+      fi
+      printf "\n"
+      for ((ci=1; ci<=${#_cmd_tools[@]}; ci++)); do
+        local cname="${_cmd_tools[$ci]}"
+        local cicon="${_cmd_icons[$ci]}"
+        local cfile="$tmpdir/context_${cname}.md"
+        printf "  ${cyn}${bld}${cicon} ${cname} 작업 컨텍스트:${rst}\n"
+        if [ -f "$cfile" ] && [ -s "$cfile" ]; then
+          local cl=$(wc -l < "$cfile" | tr -d ' ')
+          tail -10 "$cfile" | while IFS= read -r line; do
+            printf "    ${dm}%s${rst}\n" "$line"
+          done
+          [ "$cl" -gt 10 ] && printf "    ${dm}... (총 ${cl}줄)${rst}\n"
+        else
+          printf "    ${dm}(비어 있음)${rst}\n"
+        fi
+        printf "\n"
+      done
+      ;;
+  esac
+  printf "\n"
+}
+
+# ════════════════════════════════════════
+# /next - 순차 모드 라운드로빈
+# ════════════════════════════════════════
 _do_next() {
   if [[ "$mode" != "sequential" ]]; then
     printf "  ${red}순차 모드에서만 사용 가능합니다${rst}\n"
@@ -718,42 +842,234 @@ _do_next() {
   fi
   local new_prompt="$*"
   local cur=$(cat "$tmpdir/seq_turn.txt" 2>/dev/null)
+
+  # capture current AI output + diff → context.md
+  if [ -n "$cur" ] && [ "$cur" -ge 1 ]; then
+    local cur_tool_idx=${_cmd_seq_order[$(( ((cur - 1) % ${#_cmd_seq_order[@]}) + 1 ))]}
+    local cur_pane="${ai_panes[$cur_tool_idx]}"
+    local pane_content
+    pane_content=$(tmux capture-pane -t "${cur_pane}" -p -S -200 2>/dev/null)
+    local pane_meaningful
+    pane_meaningful=$(echo "$pane_content" | sed '/^[[:space:]]*$/d' | tail -n 20)
+
+    # capture git diff
+    local cur_diff=""
+    cd "$workdir"
+    local cur_head=$(git rev-parse HEAD 2>/dev/null)
+    local prev_head=$(cat "$tmpdir/git_head_track.txt" 2>/dev/null)
+    if [ -n "$prev_head" ] && [ "$prev_head" != "$cur_head" ]; then
+      cur_diff=$(git diff "$prev_head".."$cur_head" --stat 2>/dev/null)
+    fi
+    local uncommitted=$(git diff --stat 2>/dev/null)
+    [ -n "$uncommitted" ] && cur_diff="${cur_diff}\n${uncommitted}"
+    echo "$cur_head" > "$tmpdir/git_head_track.txt"
+
+    local round=$(cat "$tmpdir/round.txt" 2>/dev/null)
+    [ -z "$round" ] && round=1
+    local cur_tool_name="${_cmd_tools[$cur_tool_idx]}"
+
+    # append to shared context.md
+    {
+      echo ""
+      echo "## Round ${round} - ${cur_tool_name} (Turn ${cur})"
+      echo "### Output (last 20 lines)"
+      echo '```'
+      echo "$pane_meaningful"
+      echo '```'
+      if [ -n "$cur_diff" ]; then
+        echo "### Changes"
+        echo '```'
+        echo -e "$cur_diff"
+        echo '```'
+      fi
+      echo ""
+    } >> "$tmpdir/context.md"
+
+    printf "  ${dm}컨텍스트 저장됨 (R${round}, ${cur_tool_name})${rst}\n"
+  fi
+
+  # calculate next turn (round-robin: wraps around)
   local next=$(( cur + 1 ))
-  if [ $next -gt ${#_cmd_seq_order[@]} ]; then
-    printf "  ${grn}${bld}✔ 모든 AI가 완료되었습니다${rst}\n"
-    return
+  local cnt=${#_cmd_seq_order[@]}
+  local round=$(cat "$tmpdir/round.txt" 2>/dev/null)
+  [ -z "$round" ] && round=1
+
+  if [ $next -gt $cnt ]; then
+    next=1
+    round=$(( round + 1 ))
+    echo "$round" > "$tmpdir/round.txt"
+    printf "  ${ylw}${bld}🔄 라운드 ${round} 시작${rst}\n"
   fi
-  # 끝말잇기: update prompt for next AI if provided
-  if [ -n "$new_prompt" ]; then
-    printf '%s' "$new_prompt" > "$tmpdir/prompt.txt"
-    printf "  ${ylw}📝 새 프롬프트:${rst} ${dm}${new_prompt}${rst}\n"
-  fi
+
   echo "$next" > "$tmpdir/seq_turn.txt"
+
   local next_tool_idx=${_cmd_seq_order[$next]}
-  printf "  ${cyn}${bld}▶ #${next} ${_cmd_icons[$next_tool_idx]} ${_cmd_tools[$next_tool_idx]} 시작${rst}\n"
+  local next_pane="${ai_panes[$next_tool_idx]}"
+  local next_tool="${_cmd_tools[$next_tool_idx]}"
+
+  printf "  ${cyn}${bld}▶ R${round}:T${next} ${_cmd_icons[$next_tool_idx]} ${next_tool} 활성화${rst}\n"
+
+  # build auto-type message with context path
+  local ctx_msg=""
   if [ -n "$new_prompt" ]; then
-    printf "  ${dm}(이전 AI 변경사항 + 새 프롬프트 전달됨)${rst}\n"
+    ctx_msg="이전 AI들의 작업 컨텍스트를 읽어주세요: ${tmpdir}/context.md 새 작업: ${new_prompt}"
   else
-    printf "  ${dm}(이전 AI 변경사항 + 기존 프롬프트 전달됨)${rst}\n"
+    local orig_prompt=$(cat "$tmpdir/prompt.txt" 2>/dev/null)
+    ctx_msg="이전 AI들의 작업 컨텍스트를 읽어주세요: ${tmpdir}/context.md 이어서 작업하세요: ${orig_prompt}"
   fi
+
+  # auto-type into next AI pane via send-keys
+  _send_to_pane "${next_pane}" "${next_tool}" "$ctx_msg"
+  printf "  ${dm}→ ${_cmd_icons[$next_tool_idx]} ${next_tool}에 자동 전송됨${rst}\n"
 }
 
+# ════════════════════════════════════════
+# /skip - 순차 모드 건너뛰기 (라운드로빈)
+# ════════════════════════════════════════
 _do_skip() {
   if [[ "$mode" != "sequential" ]]; then
     printf "  ${red}순차 모드에서만 사용 가능합니다${rst}\n"
     return
   fi
   local cur=$(cat "$tmpdir/seq_turn.txt" 2>/dev/null)
-  local cur_tool_idx=${_cmd_seq_order[$cur]}
-  printf "  ${ylw}⏭ #${cur} ${_cmd_icons[$cur_tool_idx]} 건너뜀${rst}\n"
   local next=$(( cur + 1 ))
-  echo "$next" > "$tmpdir/seq_turn.txt"
-  if [ $next -le ${#_cmd_seq_order[@]} ]; then
-    local next_tool_idx=${_cmd_seq_order[$next]}
-    printf "  ${cyn}${bld}▶ #${next} ${_cmd_icons[$next_tool_idx]} ${_cmd_tools[$next_tool_idx]} 시작${rst}\n"
-  else
-    printf "  ${grn}${bld}✔ 모든 순서 완료${rst}\n"
+  local cnt=${#_cmd_seq_order[@]}
+  local round=$(cat "$tmpdir/round.txt" 2>/dev/null)
+  [ -z "$round" ] && round=1
+  if [ $next -gt $cnt ]; then
+    next=1
+    round=$(( round + 1 ))
+    echo "$round" > "$tmpdir/round.txt"
   fi
+  echo "$next" > "$tmpdir/seq_turn.txt"
+  local next_tool_idx=${_cmd_seq_order[$next]}
+  printf "  ${ylw}⏭ 건너뜀${rst}\n"
+  printf "  ${cyn}${bld}▶ R${round}:T${next} ${_cmd_icons[$next_tool_idx]} ${_cmd_tools[$next_tool_idx]} 활성화${rst}\n"
+}
+
+# ════════════════════════════════════════
+# /pick N - 동시 모드 결과 채택
+# ════════════════════════════════════════
+_do_pick() {
+  if [[ "$mode" != "parallel" ]]; then
+    printf "  ${red}동시 모드에서만 사용 가능합니다${rst}\n"
+    return
+  fi
+  local pick_num="$1"
+  if [[ ! "$pick_num" =~ ^[0-9]+$ ]] || [ "$pick_num" -lt 1 ] || [ "$pick_num" -gt ${#_cmd_tools[@]} ]; then
+    printf "  ${red}사용법: /pick N (1~${#_cmd_tools[@]})${rst}\n"
+    return
+  fi
+  local picked_tool="${_cmd_tools[$pick_num]}"
+  local picked_icon="${_cmd_icons[$pick_num]}"
+
+  # save picked AI's pane output
+  local picked_pane="${ai_panes[$pick_num]}"
+  tmux capture-pane -t "${picked_pane}" -p -S -500 > "$tmpdir/picked_output.txt" 2>/dev/null
+
+  # copy picked AI's context as winner
+  cp "$tmpdir/context_${picked_tool}.md" "$tmpdir/context_winner.md" 2>/dev/null
+
+  # copy picked AI's diff if exists
+  if [ -f "$tmpdir/diff_${picked_tool}.txt" ]; then
+    cp "$tmpdir/diff_${picked_tool}.txt" "$tmpdir/diff_winner.txt" 2>/dev/null
+  fi
+
+  printf "\n  ${grn}${bld}✔ ${picked_icon} ${picked_tool} 채택됨!${rst}\n"
+  printf "  ${dm}  결과 저장: ${tmpdir}/picked_output.txt${rst}\n"
+  printf "  ${dm}  컨텍스트: ${tmpdir}/context_winner.md${rst}\n"
+
+  # show diff summary if available
+  local dfile="$tmpdir/diff_${picked_tool}.txt"
+  if [ -f "$dfile" ] && [ -s "$dfile" ]; then
+    local dstat=$(git -C "$workdir" diff --stat 2>/dev/null)
+    printf "  ${cyn}${bld}📊 채택된 변경사항:${rst}\n"
+    head -10 "$dfile" | while IFS= read -r dl; do
+      case "$dl" in
+        +*) printf "    ${grn}%s${rst}\n" "$dl" ;;
+        -*) printf "    ${red}%s${rst}\n" "$dl" ;;
+        *)  printf "    ${dm}%s${rst}\n" "$dl" ;;
+      esac
+    done
+  fi
+  printf "\n"
+}
+
+# ════════════════════════════════════════
+# /compare - 동시 모드 결과 비교
+# ════════════════════════════════════════
+_do_compare() {
+  if [[ "$mode" != "parallel" ]]; then
+    printf "  ${red}동시 모드에서만 사용 가능합니다${rst}\n"
+    return
+  fi
+  printf "\n  ${cyn}${bld}📊 AI 결과 비교${rst}\n"
+  printf "  ${dm}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${rst}\n"
+
+  for ((ci=1; ci<=${#_cmd_tools[@]}; ci++)); do
+    local cname="${_cmd_tools[$ci]}"
+    local cicon="${_cmd_icons[$ci]}"
+    local cfile="$tmpdir/context_${cname}.md"
+    local dfile="$tmpdir/diff_${cname}.txt"
+    local sfile="$tmpdir/status_${cname}"
+    local st=$(cat "$sfile" 2>/dev/null)
+
+    printf "\n  ${cyn}${bld}${cicon} ${cname}${rst}"
+    case "$st" in
+      done:*) printf " ${grn}(완료 ${st#done:})${rst}" ;;
+      running) printf " ${ylw}(작업중)${rst}" ;;
+      *) printf " ${dm}(--)${rst}" ;;
+    esac
+    printf "\n"
+
+    # show context summary
+    if [ -f "$cfile" ] && [ -s "$cfile" ]; then
+      local cl=$(wc -l < "$cfile" | tr -d ' ')
+      printf "    ${dm}컨텍스트: ${cl}줄${rst}\n"
+    fi
+
+    # show diff summary
+    if [ -f "$dfile" ] && [ -s "$dfile" ]; then
+      local dl=$(wc -l < "$dfile" | tr -d ' ')
+      local adds=$(grep -c '^+' "$dfile" 2>/dev/null)
+      local dels=$(grep -c '^-' "$dfile" 2>/dev/null)
+      printf "    ${grn}+${adds}${rst} ${red}-${dels}${rst} ${dm}(diff ${dl}줄)${rst}\n"
+    else
+      printf "    ${dm}(변경 없음)${rst}\n"
+    fi
+
+    # show last 5 lines of pane output
+    local pane="${ai_panes[$ci]}"
+    local pout=$(tmux capture-pane -t "${pane}" -p -S -10 2>/dev/null | sed '/^[[:space:]]*$/d' | tail -3)
+    if [ -n "$pout" ]; then
+      echo "$pout" | while IFS= read -r pl; do
+        printf "    ${dm}│ %.60s${rst}\n" "$pl"
+      done
+    fi
+  done
+
+  printf "\n  ${ylw}${bld}/pick N${rst} ${dm}으로 채택하세요 (1~${#_cmd_tools[@]})${rst}\n\n"
+}
+
+# ════════════════════════════════════════
+# /board - 협동 모드 공유보드 확인
+# ════════════════════════════════════════
+_do_board() {
+  if [[ "$mode" != "collaborative" ]]; then
+    printf "  ${red}협동 모드에서만 사용 가능합니다${rst}\n"
+    return
+  fi
+  printf "\n  ${grn}${bld}📋 공유 보드 (shared.md):${rst}\n"
+  printf "  ${dm}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${rst}\n"
+  local sfile="$tmpdir/shared.md"
+  if [ -f "$sfile" ] && [ -s "$sfile" ]; then
+    cat "$sfile" | while IFS= read -r sl; do
+      printf "  ${dm}%s${rst}\n" "$sl"
+    done
+  else
+    printf "  ${dm}(비어 있음 - AI가 작업 내용을 기록하면 여기에 표시됩니다)${rst}\n"
+  fi
+  printf "\n"
 }
 
 _do_swap() {
@@ -853,7 +1169,6 @@ _do_merge() {
   for ((mi=1; mi<=${#_cmd_tools[@]}; mi++)); do
     local branch="battle-coop-${_cmd_tools[$mi]}"
     if git rev-parse --verify "$branch" >/dev/null 2>&1; then
-      # check if branch has changes
       local branch_diff=$(git diff HEAD..."$branch" --stat 2>/dev/null)
       if [ -z "$branch_diff" ]; then
         printf "  ${dm}${_cmd_icons[$mi]} ${_cmd_tools[$mi]}: (변경 없음)${rst}\n"
@@ -874,7 +1189,6 @@ _do_merge() {
   printf "\n  ${grn}${bld}✔ 머지 완료: ${merged}개${rst}"
   [ $conflicts -gt 0 ] && printf "  ${red}${bld}✖ 충돌: ${conflicts}개${rst}"
   printf "\n"
-  # cleanup worktrees (keep branches in case of conflict)
   if [ $conflicts -eq 0 ]; then
     for ((mi=1; mi<=${#_cmd_tools[@]}; mi++)); do
       local tname="${_cmd_tools[$mi]}"
@@ -896,7 +1210,6 @@ fi
 # better line editing for multibyte input (e.g., Korean)
 setopt multibyte 2>/dev/null
 stty erase '^?' 2>/dev/null
-# bind both DEL (^?) and BS (^H) for backspace compatibility across terminals/tmux
 bindkey '^?' backward-delete-char 2>/dev/null
 bindkey '^H' backward-delete-char 2>/dev/null
 bindkey '\b' backward-delete-char 2>/dev/null
@@ -934,7 +1247,6 @@ _cmd_hist_down() {
 }
 zle -N _cmd_hist_down
 
-# kill whole line widget (Ctrl-U)
 _cmd_kill_line() {
   BUFFER=""
   CURSOR=0
@@ -947,21 +1259,18 @@ bindkey '^[[B' _cmd_hist_down   # Down arrow
 bindkey '^[OB' _cmd_hist_down   # Down arrow (alt escape)
 bindkey '^U'   _cmd_kill_line   # Ctrl-U to clear line
 
-# input loop
+# ════════════════════════════════════════
+# INPUT LOOP
+# ════════════════════════════════════════
 while true; do
-  # Use vared for better multibyte/Korean input handling
-  # %{...%} wraps non-printing chars so zle calculates cursor position correctly
   input=""
   if vared -p "  %{${prp}${bld}%}▸%{${rst}%} " -c input 2>/dev/null; then
-    # clean up display artifacts from wrapped lines
     printf '\033[J'
   else
-    # fallback if vared fails
     printf "  ${prp}${bld}▸${rst} "
     read -r input || break
   fi
 
-  # save to history (non-empty input only)
   if [[ -n "$input" ]]; then
     _cmd_history+=("$input")
     _cmd_hist_idx=0
@@ -982,16 +1291,29 @@ while true; do
     /diff)
       _show_diffs
       ;;
+    /ctx)
+      _do_ctx
+      ;;
     /next|/next\ *)
       local next_prompt="${input#/next}"
       next_prompt="${next_prompt# }"
       _do_next $next_prompt
       ;;
-    /merge)
-      _do_merge
-      ;;
     /skip)
       _do_skip
+      ;;
+    /pick\ *)
+      local pick_num="${input#/pick }"
+      _do_pick "$pick_num"
+      ;;
+    /compare)
+      _do_compare
+      ;;
+    /board)
+      _do_board
+      ;;
+    /merge)
+      _do_merge
       ;;
     /prompt\ *)
       local new_prompt="${input#/prompt }"
@@ -1044,24 +1366,38 @@ while true; do
       _do_mode_switch "$new_mode"
       ;;
     /help)
-      printf "\n  ${ylw}/status${rst}  상태  ${ylw}/diff${rst}  변경사항  ${ylw}/save${rst}  저장\n"
-      printf "  ${ylw}/next X${rst} 다음+프롬프트  ${ylw}/skip${rst} 건너뛰기\n"
-      printf "  ${ylw}/merge${rst}  co-op 머지  ${ylw}/prompt X${rst} 프롬프트 변경\n"
-      printf "  ${ylw}/focus N${rst} 포커스  ${ylw}/quit${rst}  종료\n"
-      printf "  ${ylw}/mode p${rst}  동시  ${ylw}/mode s${rst}  순차  ${ylw}/mode c${rst}  co-op\n"
-      printf "  ${ylw}/swap N M${rst} 역할교체  ${ylw}/order N..${rst} 순서변경\n"
-      printf "  ${ylw}/role N X${rst} 역할변경  ${ylw}/roles${rst}  역할확인\n"
-      printf "  ${dm}↑/↓ 화살표: 이전 입력 / 지우기${rst}\n\n"
+      printf "\n  ${cyn}${bld}공통:${rst}\n"
+      printf "  ${ylw}/status${rst}  상태  ${ylw}/diff${rst}  변경사항  ${ylw}/save${rst}  저장\n"
+      printf "  ${ylw}/ctx${rst}    컨텍스트 확인  ${ylw}/prompt X${rst} 프롬프트 변경\n"
+      printf "  ${ylw}/focus N${rst} 포커스  ${ylw}/mode X${rst} 모드변경 ${dm}(p/s/c)${rst}\n"
+      printf "  ${ylw}/quit${rst}   종료\n"
+      if [[ "$mode" == "sequential" ]]; then
+        printf "\n  ${cyn}${bld}순차 모드:${rst}\n"
+        printf "  ${ylw}/next X${rst} 라운드로빈 다음 AI (컨텍스트 저장+자동전송)\n"
+        printf "  ${ylw}/skip${rst}   건너뛰기  ${ylw}/order N..${rst} 순서변경\n"
+        printf "  ${dm}  1→2→3→1→... 무한 라운드로빈, /quit으로 종료${rst}\n"
+      fi
+      if [[ "$mode" == "parallel" ]]; then
+        printf "\n  ${cyn}${bld}동시 모드:${rst}\n"
+        printf "  ${ylw}/compare${rst} 3개 결과 비교  ${ylw}/pick N${rst} N번 AI 채택\n"
+        printf "  ${dm}  각 AI 독립 컨텍스트, 서로 열람 가능${rst}\n"
+      fi
+      if [[ "$mode" == "collaborative" ]]; then
+        printf "\n  ${cyn}${bld}협동 모드:${rst}\n"
+        printf "  ${ylw}/merge${rst}  브랜치 머지  ${ylw}/board${rst}  공유보드 확인\n"
+        printf "  ${ylw}/swap N M${rst} 역할교체  ${ylw}/role N X${rst} 역할변경  ${ylw}/roles${rst} 확인\n"
+        printf "  ${dm}  역할분리 + 공유보드 + worktree 격리${rst}\n"
+      fi
+      printf "  ${dm}↑/↓ 화살표: 이전 입력${rst}\n\n"
       ;;
     /*)
-      # unrecognized / command - do NOT forward to AI
       printf "  ${red}알 수 없는 명령어: ${input}${rst}  ${dm}/help 참고${rst}\n"
       ;;
     "")
       ;;
     *)
       if [[ "$mode" == "sequential" ]]; then
-        # in sequential mode, send only to the current active AI (using order map)
+        # send only to current active AI
         local cur=$(cat "$tmpdir/seq_turn.txt" 2>/dev/null)
         if [ $cur -ge 1 ] && [ $cur -le ${#_cmd_seq_order[@]} ]; then
           local cur_tool_idx=${_cmd_seq_order[$cur]}
@@ -1115,17 +1451,11 @@ CMD_BODY
   fi
 
   # ── create tmux session ──
-  # Use stable pane IDs (%N) instead of positional indices to avoid renumbering bugs
   tmux kill-session -t "$session" 2>/dev/null
   local -a _ai_pane_ids
   local _cmd_pane_id
 
   if [ $cnt -eq 2 ]; then
-    # ┌──────────┬──────────┐
-    # │  tool1   │  tool2   │
-    # ├──────────┼──────────┤
-    # │ ⌨️ INPUT  │ 📋 HELP  │
-    # └──────────┴──────────┘
     sed -i '' 's/has_help_pane=false/has_help_pane=true/' "$cmd_script"
     tmux new-session -d -s "$session" "zsh ${_battle_scripts[1]}"
     _ai_pane_ids[1]=$(tmux display-message -t "${session}" -p '#{pane_id}')
@@ -1142,11 +1472,6 @@ CMD_BODY
     tmux select-pane -t "${_help_pane_id}" -T "📋 GUIDE"
   elif [ $cnt -ge 3 ]; then
     if [[ "$_layout_choice" == "top3" ]]; then
-      # ┌──────┬──────┬──────┐
-      # │tool1 │tool2 │tool3 │
-      # ├──────────┬─────────┤
-      # │ ⌨️ INPUT  │ 📋 HELP │
-      # └──────────┴─────────┘
       sed -i '' 's/has_help_pane=false/has_help_pane=true/' "$cmd_script"
       tmux new-session -d -s "$session" "zsh ${_battle_scripts[1]}"
       _ai_pane_ids[1]=$(tmux display-message -t "${session}" -p '#{pane_id}')
@@ -1161,11 +1486,6 @@ CMD_BODY
       tmux select-pane -t "${_cmd_pane_id}" -T "⌨️  COMMAND"
       tmux select-pane -t "${_help_pane_id}" -T "📋 GUIDE"
     else
-      # ┌──────────┬──────────┐
-      # │  tool1   │  tool2   │
-      # ├──────────┼──────────┤
-      # │  tool3   │ ⌨️ CMD   │
-      # └──────────┴──────────┘
       tmux new-session -d -s "$session" "zsh ${_battle_scripts[1]}"
       _ai_pane_ids[1]=$(tmux display-message -t "${session}" -p '#{pane_id}')
       tmux split-window -h -t "${_ai_pane_ids[1]}" -p 50 "zsh ${_battle_scripts[2]}"
@@ -1202,15 +1522,11 @@ CMD_BODY
   tmux set-option -t "$session" mouse on 2>/dev/null
 
   # ── layout protection ──
-  # Prevent AI TUIs (claude, gemini, codex) from resizing panes
   tmux set-option -t "$session" aggressive-resize on 2>/dev/null
-  # Disable passthrough escape sequences that could trigger resize
   tmux set-option -t "$session" allow-passthrough off 2>/dev/null
-  # Lock pane sizes: ignore resize requests from applications inside panes
   for _pid in "${_ai_pane_ids[@]}" "$_cmd_pane_id"; do
     tmux set-option -p -t "$_pid" remain-on-exit on 2>/dev/null
   done
-  # Set fixed layout after all panes are created
   tmux select-layout -t "${session}:0" -E 2>/dev/null
 
   # ── pane border styling ──
@@ -1250,6 +1566,7 @@ CMD_BODY
     echo "session=\"$session\""
     echo "tmpdir=\"$tmpdir\""
     echo "mode=\"$mode\""
+    echo "workdir=\"$workdir\""
     echo ""
     echo "tool_names=("
     for ((j=1; j<=$cnt; j++)); do echo "  \"${_yolo_opts[$j]}\""; done
@@ -1311,13 +1628,29 @@ while tmux has-session -t "$session" 2>/dev/null; do
     right+="${status_parts[$k]}"
   done
 
+  # mode-specific status info
+  mode_info=""
+  if [[ "$mode" == "sequential" ]]; then
+    cur_round=$(cat "$tmpdir/round.txt" 2>/dev/null)
+    cur_turn=$(cat "$tmpdir/seq_turn.txt" 2>/dev/null)
+    [ -z "$cur_round" ] && cur_round=1
+    [ -z "$cur_turn" ] && cur_turn=0
+    mode_info="${sep}#[fg=colour141,bold]R${cur_round}:T${cur_turn}#[default]"
+  elif [[ "$mode" == "parallel" ]]; then
+    # check if winner picked
+    if [ -f "$tmpdir/context_winner.md" ]; then
+      mode_info="${sep}#[fg=colour82,bold]PICKED ✔#[default]"
+    fi
+  fi
+
   if $all_done; then
     tmux set-option -t "$session" status-right \
-      " ${right} ${sep}#[fg=colour82,bold]ALL DONE ✦#[default] " 2>/dev/null
+      " ${right} ${mode_info} ${sep}#[fg=colour82,bold]ALL DONE ✦#[default] " 2>/dev/null
     break
   fi
 
-  tmux set-option -t "$session" status-right " ${right} " 2>/dev/null
+  tmux set-option -t "$session" status-right " ${right} ${mode_info} " 2>/dev/null
+
   sleep 1
 done
 MONITOR_BODY
@@ -1337,7 +1670,7 @@ MONITOR_BODY
   kill $monitor_pid 2>/dev/null
 
   # cleanup co-op worktrees (if not already merged)
-  for _wt in "$tmpdir"/work_*; do
+  for _wt in "$tmpdir"/work_*(N); do
     [ -d "$_wt" ] && git -C "$workdir" worktree remove "$_wt" 2>/dev/null
   done
 
