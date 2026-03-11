@@ -1007,8 +1007,11 @@ _do_next() {
   if [ -n "$new_prompt" ]; then
     ctx_msg="반드시 ${tmpdir}/context.md 를 열어 최신 입력을 확인한 뒤 즉시 응답하세요(추가 질문 금지). 새 작업: ${new_prompt}"
   else
-    local orig_prompt=$(cat "$tmpdir/prompt.txt" 2>/dev/null)
-    ctx_msg="반드시 ${tmpdir}/context.md 를 열어 최신 입력을 확인한 뒤 즉시 응답하세요(추가 질문 금지). 이어서 작업: ${orig_prompt}"
+    local last_cmd="$_last_user_cmd"
+    if [ -z "$last_cmd" ]; then
+      last_cmd=$(cat "$tmpdir/prompt.txt" 2>/dev/null)
+    fi
+    ctx_msg="반드시 ${tmpdir}/context.md 를 열어 최신 입력을 확인한 뒤 즉시 응답하세요(추가 질문 금지). 이어서 작업: ${last_cmd}"
   fi
 
   # auto-type into next AI pane via send-keys
@@ -1313,6 +1316,7 @@ trap 'COLUMNS=$(tput cols 2>/dev/null || echo 80)' WINCH
 
 # ── command history + arrow key widgets ──
 typeset -a _cmd_history
+_last_user_cmd=""
 _cmd_hist_idx=0
 
 _cmd_hist_up() {
@@ -1413,6 +1417,10 @@ while true; do
 
   if [[ -n "$input" ]]; then
     _cmd_history+=("$input")
+    # 슬래시 명령어가 아닌 경우에만 last_user_cmd 갱신
+    if [[ "$input" != /* ]]; then
+      _last_user_cmd="$input"
+    fi
     _cmd_hist_idx=0
   fi
 
