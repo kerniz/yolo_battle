@@ -228,6 +228,20 @@ _battle_gen_help_panel() {
     echo 'cyn=$'"'"'\033[38;5;51m'"'"
     echo 'prp=$'"'"'\033[38;5;141m'"'"
     echo ""
+    echo "cnt=$cnt"
+    echo -n "_yolo_opts=( "
+    for v in "${_yolo_opts[@]}"; do printf "'%s' " "$v"; done
+    echo ")"
+    echo -n "_yolo_icons=( "
+    for v in "${_yolo_icons[@]}"; do printf "'%s' " "$v"; done
+    echo ")"
+    echo -n "_seq_order=( "
+    for v in "${_seq_order[@]}"; do printf "'%s' " "$v"; done
+    echo ")"
+    echo -n "_roles=( "
+    for v in "${_roles[@]}"; do printf "'%s' " "$v"; done
+    echo ")"
+    echo ""
     echo 'clear'
     echo 'printf "\n"'
     echo 'printf "  ${prp}${bld}┌───────────────────────────────────────────────────┐${rst}\n"'
@@ -250,7 +264,7 @@ _battle_gen_help_panel() {
     echo 'printf "  ${prp}${bld}│${rst}  ${ylw}Ctrl+B S${rst} 동기화    ${ylw}Ctrl+B d${rst} 나가기      ${prp}${bld}│${rst}\n"'
     echo 'printf "  ${prp}${bld}└───────────────────────────────────────────────────┘${rst}\n"'
 
-    _mode_help_info "$cnt" "${_yolo_opts[@]}" "${_yolo_icons[@]}" "${_seq_order[@]}" "${_roles[@]}"
+    echo '_mode_help_info "$cnt" "${_yolo_opts[@]}" "${_yolo_icons[@]}" "${_seq_order[@]}" "${_roles[@]}"'
 
     echo ''
     echo '# keep alive'

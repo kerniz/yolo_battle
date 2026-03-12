@@ -174,7 +174,7 @@ _mode_help_info() {
   local -a seq_order=("${(@)@[1,cnt]}")
 
   echo 'printf "\n  ${cyn}${bld}📋 실행 순서:${rst}\n"'
-  for ((j=1; j<=${#seq_order[@]}; j++)); do
+  for ((j=1; j<=$cnt; j++)); do
     local oi=${seq_order[$j]}
     echo "printf '   ${j}) ${icons[$oi]} ${tools[$oi]}\n'"
   done
