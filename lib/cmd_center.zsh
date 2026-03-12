@@ -923,11 +923,36 @@ _priority_watcher_start() {
         local next_qi=$(head -1 "$tmpdir/priority_queue.txt" 2>/dev/null)
 
         if [ -z "$next_qi" ]; then
-          # 큐 비었음 = 마지막 AI도 안정화 완료 → 커맨드 완료
+          # Check if we need a final summary by P1
+          if [ "$watch_idx" != "$first_idx" ]; then
+            printf "\n  ${ylw}${bld}🔄 P1 ${first_tool} 최종 종합 검토 시작...${rst}\n"
+            local final_summary_msg="모든 AI(P1, P2, P3)의 작업이 완료되었습니다. shared.md와 각 AI의 컨텍스트를 확인하여 최종 작업 결과를 종합 검토하고 요약해주세요. 요약 내용은 shared.md에 기록하세요."
+            _send_to_pane "${first_pane}" "${first_tool}" "$final_summary_msg"
+
+            # Switch to watching P1 again for final completion
+            watch_idx=$first_idx
+            watch_pane=$first_pane
+            watch_tool=$first_tool
+            last_pane_hash=""
+            last_pane_change_ts=$(date +%s)
+            # Mark first_idx as done so we don't loop forever
+            echo "SUMMARY_MODE" > "$tmpdir/priority_queue.txt"
+            continue
+          fi
+
           local orig_cmd=$(cat "$tmpdir/priority_user_cmd.txt" 2>/dev/null)
-          printf "\n  ${grn}${bld}✔ 커맨드 완료${rst} ${dm}— 모든 우선순위 AI 작업 완료${rst}\n"
+          printf "\n  ${grn}${bld}✔ 커맨드 완료${rst} ${dm}— 모든 우선순위 작업 및 P1 최종 검토 완료${rst}\n"
           printf "  ${dm}  \"%.40s...\"${rst}\n" "$orig_cmd"
           printf '\a'  # Terminal Bell
+          break
+        fi
+
+        if [[ "$next_qi" == "SUMMARY_MODE" ]]; then
+          # Already finished the summary watch
+          local orig_cmd=$(cat "$tmpdir/priority_user_cmd.txt" 2>/dev/null)
+          printf "\n  ${grn}${bld}✔ 커맨드 완료${rst} ${dm}— 모든 우선순위 작업 및 P1 최종 검토 완료${rst}\n"
+          printf "  ${dm}  \"%.40s...\"${rst}\n" "$orig_cmd"
+          printf '\a'
           break
         fi
 
