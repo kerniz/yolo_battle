@@ -137,10 +137,10 @@ EOF
 
 # ── help panel commands ──
 _mode_help_commands() {
-  echo 'printf "  ${prp}${bld}║${rst}  ${cyn}${bld}🤝 협동 모드${rst}                                     ${prp}${bld}║${rst}\n"'
-  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}${bld}/merge${rst}   브랜치 머지${cyn}★${rst} ${ylw}/board${rst}   공유보드 확인 ${prp}${bld}║${rst}\n"'
-  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/swap N M${rst} 역할 교체    ${ylw}/role N X${rst} 역할 변경  ${prp}${bld}║${rst}\n"'
-  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/roles${rst}    역할 확인    ${dm}P1→P2→P3 캐스케이드${rst}  ${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}│${rst}  ${cyn}${bld}🤝 협동 모드${rst}                                     ${prp}${bld}│${rst}\n"'
+  echo 'printf "  ${prp}${bld}│${rst}  ${ylw}${bld}/merge${rst}   브랜치 머지${cyn}★${rst} ${ylw}/board${rst}   공유보드 확인 ${prp}${bld}│${rst}\n"'
+  echo 'printf "  ${prp}${bld}│${rst}  ${ylw}/swap N M${rst} 역할 교체    ${ylw}/role N X${rst} 역할 변경  ${prp}${bld}│${rst}\n"'
+  echo 'printf "  ${prp}${bld}│${rst}  ${ylw}/roles${rst}    역할 확인    ${dm}P1→P2→P3 캐스케이드${rst}  ${prp}${bld}│${rst}\n"'
 }
 
 # ── help panel info section ──
@@ -151,9 +151,10 @@ _mode_help_info() {
   shift $cnt
   local -a icons=("${(@)@[1,cnt]}")
   shift $cnt
-  # skip seq_order (cnt elements passed by battle.zsh)
+  local -a seq_order=("${(@)@[1,cnt]}")
   shift $cnt
   local -a roles=("${(@)@[1,cnt]}")
+
   echo 'printf "\n  ${grn}${bld}📋 역할 배정:${rst}\n"'
   for ((j=1; j<=$cnt; j++)); do
     echo "printf '   ${icons[$j]} ${tools[$j]}: ${roles[$j]:-Dev}\n'"
@@ -162,8 +163,8 @@ _mode_help_info() {
 
 # ── cmd center mode header ──
 _mode_cmd_header() {
-  printf "  ${prp}${bld}║${rst}  ${grn}${bld}🤝 CO-OP${rst} ${dm}협동 모드${rst}                ${prp}${bld}║${rst}\n"
-  printf "  ${prp}${bld}║${rst}  ${dm}우선순위 캐스케이드 + 공유보드${rst}     ${prp}${bld}║${rst}\n"
+  printf "  ${prp}${bld}│${rst}  ${grn}${bld}🤝 CO-OP${rst} ${dm}협동 모드${rst}                ${prp}${bld}│${rst}\n"
+  printf "  ${prp}${bld}│${rst}  ${dm}우선순위 캐스케이드 + 공유보드${rst}     ${prp}${bld}│${rst}\n"
 }
 
 
@@ -189,7 +190,7 @@ _mode_cmd_info() {
       fi
     done
   done
-  printf "\n  ${ylw}${bld}▶ 커맨드 → P1 먼저 → 안정화 후 P2 → P3 순 캐스케이드${rst}\n"
+  printf "\n  ${ylw}${bld}▶ 커맨드 → P1→P2→P3 캐스케이드 → P1 최종 종합 검토 및 요약${rst}\n"
 }
 
 # ── banner extra info ──
@@ -242,6 +243,6 @@ _mode_help_text() {
   printf "  ${ylw}/roles${rst}     현재 역할 확인\n"
   printf "\n  ${cyn}${bld}우선순위 캐스케이드:${rst}\n"
   printf "  ${dm}P1(구현) → P2(검토) → P3(테스트/문서) 순서로 활성화${rst}\n"
-  printf "  ${dm}커맨드 입력 → P1에만 전송 → P1 안정화(10s) 후 P2에 전송${rst}\n"
-  printf "  ${dm}P2 안정화 후 P3에 전송. 원래 커맨드+검토지시 함께 전달${rst}\n"
+  printf "  ${dm}P1 안정화(10s) 후 P2에 전송 → P2 안정화 후 P3에 전송${rst}\n"
+  printf "  ${dm}전체 안정화 후 P1이 종합 검토 (브랜치 비교+흡수+요약)${rst}\n"
 }
