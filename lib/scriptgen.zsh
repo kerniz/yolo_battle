@@ -230,25 +230,25 @@ _battle_gen_help_panel() {
     echo ""
     echo 'clear'
     echo 'printf "\n"'
-    echo 'printf "  ${prp}${bld}╔═══════════════════════════════════════════════════╗${rst}\n"'
-    echo 'printf "  ${prp}${bld}║${rst}  ${cyn}${bld}📋 명령어${rst}                                        ${prp}${bld}║${rst}\n"'
-    echo 'printf "  ${prp}${bld}╠═══════════════════════════════════════════════════╣${rst}\n"'
-    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/status${rst}  상태 확인    ${ylw}/diff${rst}     변경사항     ${prp}${bld}║${rst}\n"'
-    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/save${rst}    결과 저장    ${ylw}/ctx${rst}      컨텍스트     ${prp}${bld}║${rst}\n"'
-    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/focus N${rst} pane 포커스  ${ylw}/prompt X${rst} 프롬프트     ${prp}${bld}║${rst}\n"'
-    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/cat F${rst}   파일 비교    ${ylw}/grep P${rst}   파일 검색    ${prp}${bld}║${rst}\n"'
-    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/mode X${rst} 모드변경${dm}(p/s/c)${rst} ${ylw}/history${rst} 기록   ${prp}${bld}║${rst}\n"'
-    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/help${rst}    도움말       ${ylw}/quit${rst}     세션 종료    ${prp}${bld}║${rst}\n"'
+    echo 'printf "  ${prp}${bld}┌───────────────────────────────────────────────────┐${rst}\n"'
+    echo 'printf "  ${prp}${bld}│${rst}  ${cyn}${bld}📋  명령어${rst}                                        ${prp}${bld}│${rst}\n"'
+    echo 'printf "  ${prp}${bld}├───────────────────────────────────────────────────┤${rst}\n"'
+    echo 'printf "  ${prp}${bld}│${rst}  ${ylw}/status${rst}  상태 확인    ${ylw}/diff${rst}     변경사항     ${prp}${bld}│${rst}\n"'
+    echo 'printf "  ${prp}${bld}│${rst}  ${ylw}/save${rst}    결과 저장    ${ylw}/ctx${rst}      컨텍스트     ${prp}${bld}│${rst}\n"'
+    echo 'printf "  ${prp}${bld}│${rst}  ${ylw}/focus N${rst} pane 포커스  ${ylw}/prompt X${rst} 프롬프트     ${prp}${bld}│${rst}\n"'
+    echo 'printf "  ${prp}${bld}│${rst}  ${ylw}/cat F${rst}   파일 비교    ${ylw}/grep P${rst}   파일 검색    ${prp}${bld}│${rst}\n"'
+    echo 'printf "  ${prp}${bld}│${rst}  ${ylw}/mode X${rst} 모드변경${dm}(p/s/c)${rst} ${ylw}/history${rst} 기록   ${prp}${bld}│${rst}\n"'
+    echo 'printf "  ${prp}${bld}│${rst}  ${ylw}/help${rst}    도움말       ${ylw}/quit${rst}     세션 종료    ${prp}${bld}│${rst}\n"'
 
-    echo 'printf "  ${prp}${bld}╠═══════════════════════════════════════════════════╣${rst}\n"'
+    echo 'printf "  ${prp}${bld}├───────────────────────────────────────────────────┤${rst}\n"'
     _mode_help_commands
 
-    echo 'printf "  ${prp}${bld}╠═══════════════════════════════════════════════════╣${rst}\n"'
-    echo 'printf "  ${prp}${bld}║${rst}  ${cyn}${bld}⌨️  단축키${rst}                                       ${prp}${bld}║${rst}\n"'
-    echo 'printf "  ${prp}${bld}╠═══════════════════════════════════════════════════╣${rst}\n"'
-    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}Ctrl+B →${rst} pane이동  ${ylw}Ctrl+B z${rst} 풀스크린    ${prp}${bld}║${rst}\n"'
-    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}Ctrl+B S${rst} 동기화    ${ylw}Ctrl+B d${rst} 나가기      ${prp}${bld}║${rst}\n"'
-    echo 'printf "  ${prp}${bld}╚═══════════════════════════════════════════════════╝${rst}\n"'
+    echo 'printf "  ${prp}${bld}├───────────────────────────────────────────────────┤${rst}\n"'
+    echo 'printf "  ${prp}${bld}│${rst}  ${cyn}${bld}⌨️  단축키${rst}                                       ${prp}${bld}│${rst}\n"'
+    echo 'printf "  ${prp}${bld}├───────────────────────────────────────────────────┤${rst}\n"'
+    echo 'printf "  ${prp}${bld}│${rst}  ${ylw}Ctrl+B →${rst} pane이동  ${ylw}Ctrl+B z${rst} 풀스크린    ${prp}${bld}│${rst}\n"'
+    echo 'printf "  ${prp}${bld}│${rst}  ${ylw}Ctrl+B S${rst} 동기화    ${ylw}Ctrl+B d${rst} 나가기      ${prp}${bld}│${rst}\n"'
+    echo 'printf "  ${prp}${bld}└───────────────────────────────────────────────────┘${rst}\n"'
 
     _mode_help_info "$cnt" "${_yolo_opts[@]}" "${_yolo_icons[@]}" "${_seq_order[@]}" "${_roles[@]}"
 
@@ -321,19 +321,19 @@ if [[ "$has_help_pane" == "true" ]]; then
   printf "\n  ${dm}텍스트 입력 → AI에 전송 │ /help 도움말${rst}\n\n"
 else
   printf "\n"
-  printf "  ${prp}${bld}╔══════════════════════════════════════╗${rst}\n"
-  printf "  ${prp}${bld}║${rst}  ${ylw}${bld}⌨️  C O M M A N D   C E N T E R${rst}    ${prp}${bld}║${rst}\n"
-  printf "  ${prp}${bld}╠══════════════════════════════════════╣${rst}\n"
+  printf "  ${prp}${bld}┌──────────────────────────────────────┐${rst}\n"
+  printf "  ${prp}${bld}│${rst}  ${ylw}${bld}⌨️  C O M M A N D   C E N T E R${rst}    ${prp}${bld}│${rst}\n"
+  printf "  ${prp}${bld}├──────────────────────────────────────┤${rst}\n"
 
   _mode_cmd_header
 
-  printf "  ${prp}${bld}╠══════════════════════════════════════╣${rst}\n"
-  printf "  ${prp}${bld}║${rst}  ${ylw}/status${rst} 상태   ${ylw}/diff${rst}   변경사항  ${prp}${bld}║${rst}\n"
-  printf "  ${prp}${bld}║${rst}  ${ylw}/save${rst}   저장   ${ylw}/ctx${rst}    컨텍스트  ${prp}${bld}║${rst}\n"
-  printf "  ${prp}${bld}║${rst}  ${ylw}/focus N${rst} 포커스 ${ylw}/prompt X${rst} 프롬프트${prp}${bld}║${rst}\n"
-  printf "  ${prp}${bld}║${rst}  ${ylw}/mode X${rst} 모드   ${ylw}/help${rst}   도움말   ${prp}${bld}║${rst}\n"
-  printf "  ${prp}${bld}║${rst}  ${ylw}/quit${rst}   종료   ${ylw}C-B d${rst}  나가기   ${prp}${bld}║${rst}\n"
-  printf "  ${prp}${bld}╚══════════════════════════════════════╝${rst}\n"
+  printf "  ${prp}${bld}├──────────────────────────────────────┤${rst}\n"
+  printf "  ${prp}${bld}│${rst}  ${ylw}/status${rst} 상태   ${ylw}/diff${rst}   변경사항  ${prp}${bld}│${rst}\n"
+  printf "  ${prp}${bld}│${rst}  ${ylw}/save${rst}   저장   ${ylw}/ctx${rst}    컨텍스트  ${prp}${bld}│${rst}\n"
+  printf "  ${prp}${bld}│${rst}  ${ylw}/focus N${rst} 포커스 ${ylw}/prompt X${rst} 프롬프트${prp}${bld}│${rst}\n"
+  printf "  ${prp}${bld}│${rst}  ${ylw}/mode X${rst} 모드   ${ylw}/help${rst}   도움말   ${prp}${bld}│${rst}\n"
+  printf "  ${prp}${bld}│${rst}  ${ylw}/quit${rst}   종료   ${ylw}C-B d${rst}  나가기   ${prp}${bld}│${rst}\n"
+  printf "  ${prp}${bld}└──────────────────────────────────────┘${rst}\n"
 
   _mode_cmd_info "$_cmd_tools[@]" "$_cmd_seq_order[@]" "$_cmd_icons[@]"
 

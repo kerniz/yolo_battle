@@ -137,21 +137,24 @@ EOF
 
 # ── help panel commands ──
 _mode_help_commands() {
-  echo 'printf "  ${prp}${bld}║${rst}  ${cyn}${bld}🤝 협동 모드${rst}                                    ${prp}${bld}║${rst}\n"'
-  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}${bld}/merge${rst}   브랜치 머지${cyn}★${rst} ${ylw}/board${rst}   공유보드    ${prp}${bld}║${rst}\n"'
-  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/swap N M${rst} 역할 교체   ${ylw}/role N X${rst} 역할변경   ${prp}${bld}║${rst}\n"'
-  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/roles${rst}    역할 확인   ${dm}P1→P2→P3 캐스케이드${rst}  ${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}│${rst}  ${cyn}${bld}🤝 협동 모드${rst}                                          ${prp}${bld}│${rst}\n"'
+  echo 'printf "  ${prp}${bld}│${rst}  ${ylw}${bld}/merge${rst}   브랜치 머지${cyn}★${rst}  ${ylw}/board${rst}    공유보드 확인  ${prp}${bld}│${rst}\n"'
+  echo 'printf "  ${prp}${bld}│${rst}  ${ylw}/swap N M${rst} 역할 교체     ${ylw}/role N X${rst} 역할 변경    ${prp}${bld}│${rst}\n"'
+  echo 'printf "  ${prp}${bld}│${rst}  ${ylw}/roles${rst}    역할 확인     ${dm}P1→P2→P3 캐스케이드${rst}    ${prp}${bld}│${rst}\n"'
 }
 
 # ── help panel info section ──
 _mode_help_info() {
   local cnt="$1"
   shift
-  local -a tools=("$@")
+  local -a tools=("${(@)@[1,cnt]}")
   shift $cnt
-  local -a icons=("$@")
+  local -a icons=("${(@)@[1,cnt]}")
   shift $cnt
-  local -a roles=("$@")
+  local -a seq_order=("${(@)@[1,cnt]}")
+  shift $cnt
+  local -a roles=("${(@)@[1,cnt]}")
+
   echo 'printf "\n  ${grn}${bld}📋 역할 배정:${rst}\n"'
   for ((j=1; j<=$cnt; j++)); do
     echo "printf '   ${icons[$j]} ${tools[$j]}: ${roles[$j]:-Dev}\n'"
@@ -160,8 +163,8 @@ _mode_help_info() {
 
 # ── cmd center mode header ──
 _mode_cmd_header() {
-  printf "  ${prp}${bld}║${rst}  ${grn}${bld}🤝 CO-OP${rst} ${dm}협동 모드${rst}                ${prp}${bld}║${rst}\n"
-  printf "  ${prp}${bld}║${rst}  ${dm}우선순위 캐스케이드 + 공유보드${rst}     ${prp}${bld}║${rst}\n"
+  printf "  ${prp}${bld}│${rst}  ${grn}${bld}🤝 CO-OP${rst} ${dm}협동 모드${rst}                ${prp}${bld}│${rst}\n"
+  printf "  ${prp}${bld}│${rst}  ${dm}우선순위 캐스케이드 + 공유보드${rst}     ${prp}${bld}│${rst}\n"
 }
 
 
