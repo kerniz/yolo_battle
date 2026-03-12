@@ -77,6 +77,7 @@ fi
 # install files
 printf "  ${DIM}Installing to ${YOLO_DIR}...${RESET}\n"
 mkdir -p "$YOLO_DIR"
+chmod 700 "$YOLO_DIR"
 
 cp "$SCRIPT_DIR/yolo.zsh" "$YOLO_DIR/yolo.zsh"
 cp "$SCRIPT_DIR/battle.zsh" "$YOLO_DIR/battle.zsh"

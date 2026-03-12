@@ -227,15 +227,15 @@ yolo() {
   case "$tool" in
     claude)
       command -v claude >/dev/null 2>&1 || { echo "${red}claude not found${reset}"; return 1; }
-      command claude --dangerously-skip-permissions "$@"
+      command claude --dangerously-skip-permissions -- "$@"
       ;;
     gemini)
       command -v gemini >/dev/null 2>&1 || { echo "${red}gemini not found${reset}"; return 1; }
-      command gemini --yolo "$@"
+      command gemini --yolo -- "$@"
       ;;
     codex)
       command -v codex >/dev/null 2>&1 || { echo "${red}codex not found${reset}"; return 1; }
-      command codex --sandbox danger-full-access --ask-for-approval never "$@"
+      command codex --sandbox danger-full-access --ask-for-approval never -- "$@"
       ;;
     *)
       printf "${red}${bold} ✖  Unknown tool: $tool${reset}\n"
