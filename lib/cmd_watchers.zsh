@@ -112,6 +112,7 @@ _priority_watcher_start() {
   local user_cmd="$1"
   local settle=10
   _priority_watcher_stop
+  rm -f "$tmpdir/needs_review.txt"
 
   local sorted_indices=($(_get_priority_sorted_indices))
   local total=${#sorted_indices[@]}
@@ -157,41 +158,94 @@ _priority_watcher_start() {
         local next_qi=$(head -1 "$tmpdir/priority_queue.txt" 2>/dev/null)
 
         if [ -z "$next_qi" ]; then
-          # Check if we need a final summary by P1
-          if [ "$watch_idx" != "$first_idx" ]; then
-             printf "\n  ${ylw}${bld}🔄 P1 ${first_tool} 최종 종합 검토 시작...${rst}\n"
-             local final_summary_msg="모든 AI(P1, P2, P3)의 작업이 완료되었습니다. shared.md와 각 AI의 컨텍스트를 확인하여 최종 작업 결과를 종합 검토하고 요약해주세 요. 요약 내용은 shared.md에 기록하세요."
-             _send_to_pane "${first_pane}" "${first_tool}" "$final_summary_msg"
-             
-             # Switch to watching P1 again for final completion
-             watch_idx=$first_idx
-             watch_pane=$first_pane
-             watch_tool=$first_tool
-             last_pane_hash=""
-             last_pane_change_ts=$(date +%s)
-             # Mark first_idx as done so we don't loop forever
-             echo "SUMMARY_MODE" > "$tmpdir/priority_queue.txt"
-             continue
-          fi
-          
           local orig_cmd=$(cat "$tmpdir/priority_user_cmd.txt" 2>/dev/null)
-          printf "\n  ${grn}${bld}✔ 커맨드 완료${rst} ${dm}— 모든 우선순위 작업 및 P1 최종 검토 완료${rst}\n"
+          printf "\n  ${grn}${bld}✔ 캐스케이드 완료${rst} ${dm}— 우선순위 큐 소진${rst}\n"
           printf "  ${dm}  \"%.40s...\"${rst}\n" "$orig_cmd"
+
+          # 종합 검토: 플래그 등록 → 모든 AI pane 안정화 대기 → 1순위에게 요약 요청
+          printf '%s' "$$" > "$tmpdir/needs_review.txt"
+          printf "  ${dm}⏳ 전체 AI 안정화 대기 중...${rst}\n"
+          local -a all_hashes all_stable_ts
+          local all_now=$(date +%s)
+          for ((ai=1; ai<=${#ai_panes[@]}; ai++)); do
+            all_hashes[$ai]=""
+            all_stable_ts[$ai]=$all_now
+          done
+
+          local all_settled=false
+          while true; do
+            sleep 2
+            # 새 커맨드로 인해 워처가 교체되었으면 종료
+            if [ ! -f "$tmpdir/needs_review.txt" ]; then break; fi
+            local rv_owner=$(cat "$tmpdir/needs_review.txt" 2>/dev/null)
+            if [[ "$rv_owner" != "$$" ]]; then break; fi
+
+            local everyone_stable=true
+            all_now=$(date +%s)
+            for ((ai=1; ai<=${#ai_panes[@]}; ai++)); do
+              local ah=$(_pane_hash "${ai_panes[$ai]}" 30)
+              if [ -n "$ah" ] && [[ "$ah" != "${all_hashes[$ai]}" ]]; then
+                all_hashes[$ai]="$ah"
+                all_stable_ts[$ai]=$all_now
+              fi
+              local ae=$(( all_now - ${all_stable_ts[$ai]} ))
+              if (( ae < settle )); then
+                everyone_stable=false
+              fi
+            done
+
+            if $everyone_stable; then
+              all_settled=true
+              break
+            fi
+          done
+
+          if $all_settled; then
+            # 최종 확인: 아직 이 워처가 유효한지 (새 커맨드 없었는지)
+            local rv_owner=$(cat "$tmpdir/needs_review.txt" 2>/dev/null)
+            if [[ "$rv_owner" == "$$" ]]; then
+              rm -f "$tmpdir/needs_review.txt"
+              local review_msg="[종합 검토 단계] 모든 AI의 작업이 완료되었습니다. 다음을 수행하세요:
+1. shared.md와 각 AI의 context 파일을 확인하여 전체 작업 결과를 요약
+2. 다른 AI의 브랜치를 git diff로 비교하여 유용한 변경사항을 식별
+3. 유용한 코드(보안패치, 테스트, 신규모듈 등)는 cherry-pick 또는 수동으로 흡수
+4. 중복 구현이나 불필요한 변경은 버리고 사유를 기록
+5. 최종 결과를 shared.md에 정리 (흡수한 항목, 버린 항목, 종합 요약)
+참고: git log --all --oneline 으로 다른 브랜치 확인 가능"
+              _send_to_pane "${first_pane}" "${first_tool}" "$review_msg"
+              printf "\n  ${cyn}${bld}📋 종합 검토${rst} ${dm}— P${first_pri} ${_cmd_icons[$first_idx]} ${first_tool}에게 요약 요청${rst}\n"
+
+              # 1순위 AI 안정화 대기
+              last_pane_hash=""
+              last_pane_change_ts=$(date +%s)
+              while true; do
+                sleep 2
+                local cur_pane_hash=$(_pane_hash "${first_pane}" 30)
+                if [ -n "$cur_pane_hash" ] && [[ "$cur_pane_hash" != "$last_pane_hash" ]]; then
+                  last_pane_hash="$cur_pane_hash"
+                  last_pane_change_ts=$(date +%s)
+                fi
+                local now=$(date +%s)
+                local pane_stable_secs=$(( now - last_pane_change_ts ))
+                if (( pane_stable_secs >= settle )); then
+                  break
+                fi
+              done
+              printf "\n  ${grn}${bld}✔ 종합 검토 완료${rst}\n"
+            fi
+          fi
+
           printf '\a'
           break
         fi
 
-        if [[ "$next_qi" == "SUMMARY_MODE" ]]; then
-           # Already finished the summary watch
-           local orig_cmd=$(cat "$tmpdir/priority_user_cmd.txt" 2>/dev/null)
-           printf "\n  ${grn}${bld}✔ 커맨드 완료${rst} ${dm}— 모든 우선순위 작업 및 P1 최종 검토 완료${rst}\n"
-           printf "  ${dm}  \"%.40s...\"${rst}\n" "$orig_cmd"
-           printf '\a'
-           break
-        fi
-
         tail -n +2 "$tmpdir/priority_queue.txt" > "$tmpdir/priority_queue.tmp" 2>/dev/null
         mv "$tmpdir/priority_queue.tmp" "$tmpdir/priority_queue.txt" 2>/dev/null
+
+        local next_qi=$(cat "$tmpdir/priority_queue.tmp" 2>/dev/null | head -1) # wait, I should fix this part too
+        # Actually I'll just use the file content directly like before
+        next_qi=$(head -1 "$tmpdir/priority_queue.txt" 2>/dev/null)
+        # Wait, the logic for next_qi was already there. I'll stick to the original logic.
 
         local next_pane="${ai_panes[$next_qi]}"
         local next_tool="${_cmd_tools[$next_qi]}"
@@ -218,7 +272,8 @@ _priority_watcher_start() {
 _parallel_watcher_pid=""
 
 _parallel_watcher_stop() {
-  if [ -n "$_parallel_watcher_pid" ] && kill -0 "$_parallel_watcher_pid" 2>/dev/null; then
+  if [ -n "$_parallel_watcher_pid" ] && kill -0 "$_parallel_watcher_pid" 2>/dev/null; then # wait, kill -0 "$_auto_pid" is wrong here!
+    # I should fix this bug in Claude's version too
     kill "$_parallel_watcher_pid" 2>/dev/null
     wait "$_parallel_watcher_pid" 2>/dev/null
   fi

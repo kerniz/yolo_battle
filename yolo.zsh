@@ -51,7 +51,7 @@ yolo() {
     fi
 
     _yolo_select_weapon
-    
+
     tool="${_yolo_opts[$_selected_idx]}"
     local tool_icon="${_yolo_icons[$_selected_idx]}"
     local tool_color="${tcolors[$_selected_idx]}"

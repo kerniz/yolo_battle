@@ -41,9 +41,6 @@ _battle_reset_state() {
       [ -L "$_wt" ] && rm -f "$_wt"
     fi
   done
-  for _br in $(git -C "$workdir" branch --list "battle-coop-*" 2>/dev/null); do
-    git -C "$workdir" branch -D "$_br" 2>/dev/null
-  done
 }
 
 # ── cleanup co-op worktrees ──

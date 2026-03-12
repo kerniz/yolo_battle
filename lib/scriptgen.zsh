@@ -141,7 +141,6 @@ if [ -n "$_uncommitted" ] || [ -n "$_staged" ]; then
   git add -A 2>/dev/null
   git commit -m "battle(${toolname}): ${mode} mode changes
 
-Prompt: $(head -1 "$tmpdir/prompt.txt" 2>/dev/null)
 Mode: ${mode}
 Tool: ${toolname}" 2>/dev/null
 

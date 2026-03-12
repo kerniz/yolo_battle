@@ -20,10 +20,10 @@ _yolo_loading() {
   local width=30
 
   printf "\n"
-  printf "${dim}  ╔══════════════════════════════════════════╗${reset}\n"
-  printf "${dim}  ║                                          ║${reset}\n"
-  printf "${dim}  ║                                          ║${reset}\n"
-  printf "${dim}  ╚══════════════════════════════════════════╝${reset}\n"
+  printf "${dim}  ┌──────────────────────────────────────────┐${reset}\n"
+  printf "${dim}  │                                          │${reset}\n"
+  printf "${dim}  │                                          │${reset}\n"
+  printf "${dim}  └──────────────────────────────────────────┘${reset}\n"
   printf "\033[3A"
 
   for ((f=0; f<total; f++)); do
@@ -46,18 +46,18 @@ _yolo_loading() {
       bar+="${dim}░"
     done
 
-    printf "\r${dim}  ║${reset}  ${tool_color}${bold}${spin}${reset} ${white}${bold}${msg}${reset}"
+    printf "\r${dim}  │${reset}  ${tool_color}${bold}${spin}${reset} ${white}${bold}${msg}${reset}"
     printf "\033[K"
-    printf "\n\r${dim}  ║${reset}  ${bar}${reset} ${tool_color}${spark} ${bold}${pct}%%${reset}"
+    printf "\n\r${dim}  │${reset}  ${bar}${reset} ${tool_color}${spark} ${bold}${pct}%%${reset}"
     printf "\033[K"
     printf "\033[1A"
 
     sleep 0.05
   done
 
-  printf "\r${dim}  ║${reset}  ${tool_color}${bold}✔${reset} ${white}${bold}Ready! Launching ${tool_color}${tool_name}${white}...${reset}"
+  printf "\r${dim}  │${reset}  ${tool_color}${bold}✔${reset} ${white}${bold}Ready! Launching ${tool_color}${tool_name}${white}...${reset}"
   printf "\033[K\n"
-  printf "\r${dim}  ║${reset}  "
+  printf "\r${dim}  │${reset}  "
   for ((b=1; b<=width; b++)); do
     local ci=$(( (b * ${#bar_colors[@]} / width) ))
     [ $ci -eq 0 ] && ci=1
@@ -66,16 +66,15 @@ _yolo_loading() {
   done
   printf "${reset} ${green}${bold}✦ 100%%${reset}"
   printf "\033[K\n"
-  printf "${dim}  ╚══════════════════════════════════════════╝${reset}\n"
+  printf "${dim}  └──────────────────────────────────────────┘${reset}\n"
   printf "\n"
 }
 
 _yolo_select_weapon() {
-  local -a opts=("$@")
   local i=0
   local key
-  local cursor_up=$'\033'A
-  local cursor_down=$'\033'B
+  local cursor_up=$'\033[A'
+  local cursor_down=$'\033[B'
 
   printf "\033[?25l"
   trap 'printf "\033[?25h"' INT
@@ -83,7 +82,7 @@ _yolo_select_weapon() {
   local total_lines=0
   printf "\n"
   printf "  ${purple}${bold}⚡ PICK YOUR WEAPON ⚡${reset}\n"
-  printf "  ${purple}${bold}╔══════════════════════════════════════╗${reset}\n"
+  printf "  ${purple}${bold}┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓${reset}\n"
   total_lines=2
 
   for ((j=1; j<=${#_yolo_opts[@]}; j++)); do
@@ -91,16 +90,16 @@ _yolo_select_weapon() {
     local icon="${_yolo_icons[$j]}"
     local col="${tcolors[$j]}"
     if [ $((j-1)) -eq "$i" ]; then
-      printf "  ${purple}${bold}║${reset} ${bg_sel} ${col}${bold} ▸ ${icon}  %-18s${reset}${bg_sel}      ${reset} ${purple}${bold}║${reset}\n" "${(U)name}"
+      printf "  ${purple}${bold}┃${reset} ${bg_sel} ${col}${bold} ▸ ${icon}  %-18s${reset}${bg_sel}      ${reset} ${purple}${bold}┃${reset}\n" "${(U)name}"
     else
-      printf "  ${purple}${bold}║${reset}   ${dim}   ${icon}  %-18s      ${reset} ${purple}${bold}║${reset}\n" "$name"
+      printf "  ${purple}${bold}┃${reset}   ${dim}   ${icon}  %-18s      ${reset} ${purple}${bold}┃${reset}\n" "$name"
     fi
     total_lines=$((total_lines + 1))
   done
 
-  printf "  ${purple}${bold}╠══════════════════════════════════════╣${reset}\n"
-  printf "  ${purple}${bold}║${reset}  ${dim}↑↓ navigate${reset}  ${dim}⏎ select${reset}             ${purple}${bold}║${reset}\n"
-  printf "  ${purple}${bold}╚══════════════════════════════════════╝${reset}\n"
+  printf "  ${purple}${bold}┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫${reset}\n"
+  printf "  ${purple}${bold}┃${reset}  ${dim}↑↓ navigate${reset}  ${dim}⏎ select${reset}             ${purple}${bold}┃${reset}\n"
+  printf "  ${purple}${bold}┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛${reset}\n"
   total_lines=$((total_lines + 3))
 
   while true; do
@@ -131,9 +130,9 @@ _yolo_select_weapon() {
       local icon="${_yolo_icons[$j]}"
       local col="${tcolors[$j]}"
       if [ $((j-1)) -eq "$i" ]; then
-        printf "\r  ${purple}${bold}║${reset} ${bg_sel} ${col}${bold} ▸ ${icon}  %-18s${reset}${bg_sel}      ${reset} ${purple}${bold}║${reset}\n" "${(U)name}"
+        printf "\r  ${purple}${bold}┃${reset} ${bg_sel} ${col}${bold} ▸ ${icon}  %-18s${reset}${bg_sel}      ${reset} ${purple}${bold}┃${reset}\n" "${(U)name}"
       else
-        printf "\r  ${purple}${bold}║${reset}   ${dim}   ${icon}  %-18s      ${reset} ${purple}${bold}║${reset}\n" "$name"
+        printf "\r  ${purple}${bold}┃${reset}   ${dim}   ${icon}  %-18s      ${reset} ${purple}${bold}┃${reset}\n" "$name"
       fi
     done
     printf "\033[3B"
