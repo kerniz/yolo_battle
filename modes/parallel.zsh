@@ -62,12 +62,9 @@ EOF
 
 # ── help panel commands ──
 _mode_help_commands() {
-  echo 'printf "  ${prp}${bld}╠═══════════════════════════════════════════════════╣${rst}\n"'
-  echo 'printf "  ${prp}${bld}║${rst}  ${cyn}동시 모드 명령어${rst}                                  ${prp}${bld}║${rst}\n"'
-  echo 'printf "  ${prp}${bld}╠═══════════════════════════════════════════════════╣${rst}\n"'
-  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}${bld}/pick N${rst}    직접 채택${cyn}★${rst}   ${ylw}/compare${rst}   결과 비교  ${prp}${bld}║${rst}\n"'
-  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/compare N${rst} AI가 선택    ${ylw}/merge N${rst}  AI가 종합  ${prp}${bld}║${rst}\n"'
-  echo 'printf "  ${prp}${bld}║${rst}  ${dm}  완료 감지 후 자동 안내${rst}                          ${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${cyn}${bld}⚡ 동시 모드${rst}                                          ${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}${bld}/pick N${rst}  직접 채택${cyn}★${rst}    ${ylw}/compare${rst}  결과 비교      ${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/compare N${rst} AI선택     ${ylw}/merge N${rst}  AI가 종합     ${prp}${bld}║${rst}\n"'
 }
 
 # ── help panel info section ──
@@ -90,17 +87,6 @@ _mode_cmd_header() {
   printf "  ${prp}${bld}║${rst}  ${dm}각자 독립 작업 → /pick N 채택${rst}      ${prp}${bld}║${rst}\n"
 }
 
-# ── cmd center mode commands ──
-_mode_cmd_commands() {
-  printf "  ${prp}${bld}╠══════════════════════════════════════╣${rst}\n"
-  printf "  ${prp}${bld}║${rst}  ${cyn}동시 모드 명령어:${rst}                    ${prp}${bld}║${rst}\n"
-  printf "  ${prp}${bld}╠══════════════════════════════════════╣${rst}\n"
-  printf "  ${prp}${bld}║${rst}  ${ylw}${bld}/pick N${rst}   직접 채택${cyn}★${rst}             ${prp}${bld}║${rst}\n"
-  printf "  ${prp}${bld}║${rst}  ${ylw}/compare${rst}   결과 비교 테이블        ${prp}${bld}║${rst}\n"
-  printf "  ${prp}${bld}║${rst}  ${ylw}/compare N${rst} N번 AI가 최적 선택     ${prp}${bld}║${rst}\n"
-  printf "  ${prp}${bld}║${rst}  ${ylw}/merge N${rst}   N번 AI가 결과 종합     ${prp}${bld}║${rst}\n"
-  printf "  ${prp}${bld}║${rst}  ${dm}  완료 감지 후 자동 안내 표시${rst}       ${prp}${bld}║${rst}\n"
-}
 
 # ── cmd center mode info ──
 _mode_cmd_info() {

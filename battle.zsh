@@ -270,16 +270,6 @@ _yolo_battle() {
     fi
   fi
 
-  # set default guideline when no prompt given (mode-specific)
-  if [ -z "$prompt" ]; then
-    if typeset -f _mode_default_prompt > /dev/null 2>&1; then
-      prompt="$(_mode_default_prompt)"
-    else
-      prompt="사용자의 지시를 대기하세요. 스스로 판단해서 코드를 수정하거나 파일을 변경하지 마세요."
-    fi
-  fi
-  printf '%s' "$prompt" > "$tmpdir/prompt.txt"
-  printf '%s' "$prompt" > "$tmpdir/user_cmd.txt"
   printf '%s' "$mode" > "$tmpdir/mode.txt"
   printf '%s' "$workdir" > "$tmpdir/workdir.txt"
   echo "0" > "$tmpdir/seq_turn.txt"
@@ -302,6 +292,17 @@ _yolo_battle() {
     printf "${red}${bold} ✖  Mode skill file not found: ${_mode_file}${reset}\n"
     return 1
   fi
+
+  # ── set default prompt after mode skill is loaded ──
+  if [ -z "$prompt" ]; then
+    if typeset -f _mode_default_prompt > /dev/null 2>&1; then
+      prompt="$(_mode_default_prompt)"
+    else
+      prompt="사용자의 지시를 대기하세요. 스스로 판단해서 코드를 수정하거나 파일을 변경하지 마세요."
+    fi
+  fi
+  printf '%s' "$prompt" > "$tmpdir/prompt.txt"
+  printf '%s' "$prompt" > "$tmpdir/user_cmd.txt"
 
   # ── setup context files for current mode ──
   _mode_setup_context "$tmpdir" "$cnt" "${_yolo_opts[@]}"
@@ -513,18 +514,25 @@ _yolo_battle() {
 
     # co-op mode: create git worktree for file isolation (no simultaneous writes)
     if [[ "$mode" == "collaborative" ]]; then
+      local _wt_ok=false
       if $_coop_use_worktree; then
-        # Cleanup existing branch if any to avoid conflicts (Technical Relay from Claude)
-        git -C "$workdir" branch -D "battle-coop-${tname}" 2>/dev/null
+        # Cleanup existing worktree/branch from previous sessions
+        local _old_wt
+        _old_wt=$(git -C "$workdir" worktree list --porcelain 2>/dev/null | grep -B1 "branch.*battle-coop-${tname}$" | head -1 | sed 's/^worktree //')
+        if [ -n "$_old_wt" ] && [ "$_old_wt" != "$toolworkdir" ]; then
+          git -C "$workdir" worktree remove --force "$_old_wt" 2>/dev/null
+        fi
         git -C "$workdir" worktree prune 2>/dev/null
+        git -C "$workdir" branch -D "battle-coop-${tname}" 2>/dev/null
 
-        if ! git -C "$workdir" worktree add -f -q "$toolworkdir" -b "battle-coop-${tname}" HEAD 2>/dev/null; then
+        if git -C "$workdir" worktree add -f -q "$toolworkdir" -b "battle-coop-${tname}" HEAD 2>/dev/null; then
+          _wt_ok=true
+        else
           printf "${yellow}  ⚠ worktree failed for ${tname}, using shared dir${reset}\n"
-          _coop_use_worktree=false
         fi
       fi
 
-      if ! $_coop_use_worktree; then
+      if ! $_wt_ok; then
         rm -rf "$toolworkdir" 2>/dev/null
         ln -s "$workdir" "$toolworkdir"
       fi
@@ -729,7 +737,7 @@ DONE_END
     echo 'clear'
     echo 'printf "\n"'
     echo 'printf "  ${prp}${bld}╔═══════════════════════════════════════════════════╗${rst}\n"'
-    echo 'printf "  ${prp}${bld}║${rst}  ${cyn}공통 명령어${rst}                                      ${prp}${bld}║${rst}\n"'
+    echo 'printf "  ${prp}${bld}║${rst}  ${cyn}${bld}📋 명령어${rst}                                        ${prp}${bld}║${rst}\n"'
     echo 'printf "  ${prp}${bld}╠═══════════════════════════════════════════════════╣${rst}\n"'
     echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/status${rst}  상태 확인    ${ylw}/diff${rst}     변경사항     ${prp}${bld}║${rst}\n"'
     echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/save${rst}    결과 저장    ${ylw}/ctx${rst}      컨텍스트     ${prp}${bld}║${rst}\n"'
@@ -739,13 +747,14 @@ DONE_END
     echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/help${rst}    도움말       ${ylw}/quit${rst}     세션 종료    ${prp}${bld}║${rst}\n"'
 
     # mode-specific help commands (from mode skill)
+    echo 'printf "  ${prp}${bld}╠══════════════════════════════════════════════════════════╣${rst}\n"'
     _mode_help_commands
 
     echo 'printf "  ${prp}${bld}╠═══════════════════════════════════════════════════╣${rst}\n"'
-    echo 'printf "  ${prp}${bld}║${rst}  ${cyn}단축키${rst}                                          ${prp}${bld}║${rst}\n"'
+    echo 'printf "  ${prp}${bld}║${rst}  ${cyn}${bld}⌨️  단축키${rst}                                       ${prp}${bld}║${rst}\n"'
     echo 'printf "  ${prp}${bld}╠═══════════════════════════════════════════════════╣${rst}\n"'
-    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}Ctrl+B → 방향키${rst} pane이동  ${ylw}Ctrl+B → z${rst} 풀스크린${prp}${bld}║${rst}\n"'
-    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}Ctrl+B → S${rst}     동기화    ${ylw}Ctrl+B → d${rst} 나가기  ${prp}${bld}║${rst}\n"'
+    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}Ctrl+B →${rst} pane이동  ${ylw}Ctrl+B z${rst} 풀스크린    ${prp}${bld}║${rst}\n"'
+    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}Ctrl+B S${rst} 동기화    ${ylw}Ctrl+B d${rst} 나가기      ${prp}${bld}║${rst}\n"'
     echo 'printf "  ${prp}${bld}╚═══════════════════════════════════════════════════╝${rst}\n"'
 
     # mode-specific info section (from mode skill)
@@ -823,22 +832,11 @@ else
   _mode_cmd_header
 
   printf "  ${prp}${bld}╠══════════════════════════════════════╣${rst}\n"
-  printf "  ${prp}${bld}║${rst}  ${cyn}공통 명령어:${rst}                        ${prp}${bld}║${rst}\n"
-  printf "  ${prp}${bld}╠══════════════════════════════════════╣${rst}\n"
   printf "  ${prp}${bld}║${rst}  ${ylw}/status${rst} 상태   ${ylw}/diff${rst}   변경사항  ${prp}${bld}║${rst}\n"
   printf "  ${prp}${bld}║${rst}  ${ylw}/save${rst}   저장   ${ylw}/ctx${rst}    컨텍스트  ${prp}${bld}║${rst}\n"
   printf "  ${prp}${bld}║${rst}  ${ylw}/focus N${rst} 포커스 ${ylw}/prompt X${rst} 프롬프트${prp}${bld}║${rst}\n"
-  printf "  ${prp}${bld}║${rst}  ${ylw}/cat F${rst}  비교   ${ylw}/grep P${rst}  검색     ${prp}${bld}║${rst}\n"
-
-  _mode_cmd_commands
-
-  printf "  ${prp}${bld}╠══════════════════════════════════════╣${rst}\n"
-  printf "  ${prp}${bld}║${rst}  ${ylw}/mode X${rst} 모드${dm}(p/s/c)${rst} ${ylw}/help${rst} 도움말${prp}${bld}║${rst}\n"
-  printf "  ${prp}${bld}║${rst}  ${ylw}/history${rst} 기록    ${ylw}/quit${rst} 종료     ${prp}${bld}║${rst}\n"
-  printf "  ${prp}${bld}╠══════════════════════════════════════╣${rst}\n"
-  printf "  ${prp}${bld}║${rst}  ${cyn}단축키:${rst}                            ${prp}${bld}║${rst}\n"
-  printf "  ${prp}${bld}║${rst}  ${ylw}C-B 방향키${rst} 이동 ${ylw}C-B z${rst} 풀스크린 ${prp}${bld}║${rst}\n"
-  printf "  ${prp}${bld}║${rst}  ${ylw}C-B S${rst} 동기화    ${ylw}C-B d${rst} 나가기   ${prp}${bld}║${rst}\n"
+  printf "  ${prp}${bld}║${rst}  ${ylw}/mode X${rst} 모드   ${ylw}/help${rst}   도움말   ${prp}${bld}║${rst}\n"
+  printf "  ${prp}${bld}║${rst}  ${ylw}/quit${rst}   종료   ${ylw}C-B d${rst}  나가기   ${prp}${bld}║${rst}\n"
   printf "  ${prp}${bld}╚══════════════════════════════════════╝${rst}\n"
 
   _mode_cmd_info "$_cmd_tools[@]" "$_cmd_seq_order[@]" "$_cmd_icons[@]"
