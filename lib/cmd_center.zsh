@@ -710,21 +710,13 @@ _do_auto_merge_push() {
     return
   fi
 
-  # 사용자 확인
-  printf "  ${ylw}${bld}머지 후 푸시하시겠습니까?${rst}\n"
-  printf "  ${dm}  y) 머지 + 커밋 + 푸시${rst}\n"
-  printf "  ${dm}  m) 머지만 (푸시 안 함)${rst}\n"
-  printf "  ${dm}  n) 나중에 (/merge로 수동)${rst}\n"
-  printf "  ${ylw}선택 [y/m/n]:${rst} "
+  # 사용자 확인 — 머지는 필수, 푸시만 선택
+  printf "  ${ylw}${bld}브랜치 머지를 진행합니다. 푸시도 하시겠습니까?${rst}\n"
+  printf "  ${dm}  y) 머지 + 푸시  (기본)${rst}\n"
+  printf "  ${dm}  n) 머지만 (푸시는 나중에)${rst}\n"
+  printf "  ${ylw}선택 [Y/n]:${rst} "
   local _merge_choice
   read -r _merge_choice
-
-  case "$_merge_choice" in
-    n|N)
-      printf "  ${dm}건너뜀. /merge 로 나중에 실행 가능합니다.${rst}\n\n"
-      return
-      ;;
-  esac
 
   # 머지 실행
   local merged=0 conflicts=0
@@ -773,8 +765,8 @@ _do_auto_merge_push() {
   done
   printf "  ${dm}워크트리/브랜치 정리 완료${rst}\n"
 
-  # 푸시
-  if [[ "$_merge_choice" == "y" || "$_merge_choice" == "Y" ]]; then
+  # 푸시 (n/N 이외는 모두 푸시)
+  if [[ "$_merge_choice" != "n" && "$_merge_choice" != "N" ]]; then
     printf "\n  ${cyn}${bld}📤 푸시 중...${rst}"
     local _current_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
     if git push origin "$_current_branch" 2>/dev/null; then
@@ -1089,13 +1081,13 @@ _priority_watcher_start() {
             local rv_owner=$(cat "$tmpdir/needs_review.txt" 2>/dev/null)
             if [[ "$rv_owner" == "$$" ]]; then
               rm -f "$tmpdir/needs_review.txt"
-              local review_msg="[종합 검토 단계] 모든 AI의 작업이 완료되었습니다. 다음을 수행하세요:
-1. shared.md와 각 AI의 context 파일을 확인하여 전체 작업 결과를 요약
-2. 다른 AI의 브랜치를 git diff로 비교하여 유용한 변경사항을 식별
-3. 유용한 코드(보안패치, 테스트, 신규모듈 등)는 cherry-pick 또는 수동으로 흡수
-4. 중복 구현이나 불필요한 변경은 버리고 사유를 기록
+              local review_msg="[종합 검토 및 머지 준비 단계] 모든 AI의 작업이 완료되었습니다. 이 검토 후 모든 브랜치가 머지됩니다. 다음을 수행하세요:
+1. 다른 AI의 브랜치를 git diff로 비교하여 유용한 변경사항을 식별 (git log --all --oneline, git diff HEAD...battle-coop-{이름})
+2. 유용한 코드(보안패치, 테스트, 신규모듈 등)는 cherry-pick 또는 수동으로 자신의 브랜치에 흡수
+3. 충돌 가능성이 있는 부분은 미리 자신의 브랜치에서 정리 (같은 파일을 다르게 수정한 경우 자신의 버전을 기준으로 통합)
+4. 중복 구현이나 불필요한 변경은 흡수하지 않고 사유를 기록
 5. 최종 결과를 shared.md에 정리 (흡수한 항목, 버린 항목, 종합 요약)
-참고: git log --all --oneline 으로 다른 브랜치 확인 가능"
+중요: 이 단계 후 자동으로 브랜치 머지가 진행됩니다. 충돌을 최소화하도록 정리하세요."
               _send_to_pane "${first_pane}" "${first_tool}" "$review_msg"
               printf "\n  ${cyn}${bld}📋 종합 검토${rst} ${dm}— P${first_pri} ${_cmd_icons[$first_idx]} ${first_tool}에게 요약 요청${rst}\n"
 
