@@ -1,8 +1,12 @@
 #!/bin/bash
 # yolo_battle installer
+# Usage:
+#   curl -fsSL https://raw.githubusercontent.com/kerniz/yolo_battle/main/install.sh | bash
+#   or: git clone ... && ./install.sh
 set -e
 
 YOLO_DIR="${HOME}/.yolo"
+REPO_URL="https://github.com/kerniz/yolo_battle.git"
 YELLOW='\033[38;5;220m'
 GREEN='\033[38;5;82m'
 RED='\033[38;5;196m'
@@ -52,16 +56,38 @@ if [ $found -eq 0 ]; then
   exit 1
 fi
 
+# determine source: local clone or remote download
+SCRIPT_DIR=""
+TMPCLONE=""
+
+if [ -f "$(cd "$(dirname "$0")" 2>/dev/null && pwd)/yolo.zsh" ] 2>/dev/null; then
+  SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+  printf "  ${DIM}Installing from local directory...${RESET}\n"
+else
+  if ! command -v git >/dev/null 2>&1; then
+    printf "  ${RED}${BOLD}✖  git is required for remote install${RESET}\n"
+    exit 1
+  fi
+  TMPCLONE="$(mktemp -d /tmp/yolo-install-XXXXXX)"
+  printf "  ${DIM}Downloading from GitHub...${RESET}\n"
+  git clone --depth 1 "$REPO_URL" "$TMPCLONE" 2>/dev/null
+  SCRIPT_DIR="$TMPCLONE"
+fi
+
 # install files
 printf "  ${DIM}Installing to ${YOLO_DIR}...${RESET}\n"
 mkdir -p "$YOLO_DIR"
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cp "$SCRIPT_DIR/yolo.zsh" "$YOLO_DIR/yolo.zsh"
 cp "$SCRIPT_DIR/battle.zsh" "$YOLO_DIR/battle.zsh"
 mkdir -p "$YOLO_DIR/modes"
 cp "$SCRIPT_DIR/modes/"*.zsh "$YOLO_DIR/modes/" 2>/dev/null
 chmod +x "$YOLO_DIR/yolo.zsh" "$YOLO_DIR/battle.zsh"
+
+# cleanup temp clone
+if [ -n "$TMPCLONE" ]; then
+  rm -rf "$TMPCLONE"
+fi
 
 printf "  ${GREEN}${BOLD}✔${RESET} Files installed\n\n"
 
