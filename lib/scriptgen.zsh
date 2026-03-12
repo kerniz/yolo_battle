@@ -16,19 +16,34 @@ _battle_gen_tool_scripts() {
     if [[ "$mode" == "collaborative" ]]; then
       local _wt_ok=false
       if $_coop_use_worktree; then
-        # Cleanup existing worktree/branch from previous sessions
+        # Cleanup existing worktree from previous sessions
         local _old_wt
         _old_wt=$(git -C "$workdir" worktree list --porcelain 2>/dev/null | grep -B1 "branch.*battle-coop-${tname}$" | head -1 | sed 's/^worktree //')
         if [ -n "$_old_wt" ] && [ "$_old_wt" != "$toolworkdir" ]; then
           git -C "$workdir" worktree remove --force "$_old_wt" 2>/dev/null
         fi
         git -C "$workdir" worktree prune 2>/dev/null
-        git -C "$workdir" branch -D "battle-coop-${tname}" 2>/dev/null
 
-        if git -C "$workdir" worktree add -f -q "$toolworkdir" -b "battle-coop-${tname}" HEAD 2>/dev/null; then
-          _wt_ok=true
-        else
-          printf "${yellow}  ⚠ worktree failed for ${tname}, using shared dir${reset}\n"
+        # 머지 안 된 브랜치는 보호, 머지된 브랜치만 삭제
+        if git -C "$workdir" rev-parse --verify "battle-coop-${tname}" >/dev/null 2>&1; then
+          if git -C "$workdir" merge-base --is-ancestor "battle-coop-${tname}" HEAD 2>/dev/null; then
+            # 이미 머지됨 → 삭제 후 새로 생성
+            git -C "$workdir" branch -D "battle-coop-${tname}" 2>/dev/null
+          else
+            # 머지 안 됨 → 경고, 기존 브랜치에서 worktree 생성
+            printf "${yellow}  ⚠ ${tname}: 이전 미머지 브랜치 발견 → 이어서 작업${reset}\n"
+            if git -C "$workdir" worktree add -f -q "$toolworkdir" "battle-coop-${tname}" 2>/dev/null; then
+              _wt_ok=true
+            fi
+          fi
+        fi
+
+        if ! $_wt_ok; then
+          if git -C "$workdir" worktree add -f -q "$toolworkdir" -b "battle-coop-${tname}" HEAD 2>/dev/null; then
+            _wt_ok=true
+          else
+            printf "${yellow}  ⚠ worktree failed for ${tname}, using shared dir${reset}\n"
+          fi
         fi
       fi
 
