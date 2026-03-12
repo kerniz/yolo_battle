@@ -6,5 +6,5 @@ test:
 	bats tests
 
 lint:
-	zsh -n yolo.zsh battle.zsh modes/*.zsh
+	zsh -n yolo.zsh battle.zsh modes/*.zsh lib/*.zsh
 	bash -n install.sh
