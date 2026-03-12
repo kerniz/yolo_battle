@@ -62,30 +62,29 @@ EOF
 
 # ── help panel commands ──
 _mode_help_commands() {
-  echo 'printf "  ${prp}${bld}│${rst}  ${cyn}${bld}⚡ 동시 모드${rst}                                     ${prp}${bld}│${rst}\n"'
-  echo 'printf "  ${prp}${bld}│${rst}  ${ylw}${bld}/pick N${rst}  직접 채택${cyn}★${rst}   ${ylw}/compare${rst} 결과 비교    ${prp}${bld}│${rst}\n"'
-  echo 'printf "  ${prp}${bld}│${rst}  ${ylw}/compare N${rst} AI선택    ${ylw}/merge N${rst} AI가 종합    ${prp}${bld}│${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${cyn}${bld}⚡ 동시 모드${rst}                                          ${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}${bld}/pick N${rst}  직접 채택${cyn}★${rst}    ${ylw}/compare${rst}  결과 비교      ${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/compare N${rst} AI선택     ${ylw}/merge N${rst}  AI가 종합     ${prp}${bld}║${rst}\n"'
 }
 
 # ── help panel info section ──
 _mode_help_info() {
   local cnt="$1"
   shift
-  local -a tools=("${(@)@[1,cnt]}")
+  local -a tools=("$@")
   shift $cnt
-  local -a icons=("${(@)@[1,cnt]}")
-
+  local -a icons=("$@")
   echo 'printf "\n  ${ylw}${bld}📋 컨텍스트:${rst}\n"'
   for ((j=1; j<=$cnt; j++)); do
     echo "printf '   ${icons[$j]} ${tools[$j]}: context_${tools[$j]}.md\n'"
   done
-  echo "printf '  ${dm}/pick N 으로 최종 채택${rst}\n'"
+  echo "printf '  \${dm}/pick N 으로 최종 채택\${rst}\n'"
 }
 
 # ── cmd center mode header ──
 _mode_cmd_header() {
-  printf "  ${prp}${bld}│${rst}  ${ylw}${bld}⚡ PARALLEL${rst} ${dm}동시 모드${rst}             ${prp}${bld}│${rst}\n"
-  printf "  ${prp}${bld}│${rst}  ${dm}각자 독립 작업 → /pick N 채택${rst}      ${prp}${bld}│${rst}\n"
+  printf "  ${prp}${bld}║${rst}  ${ylw}${bld}⚡ PARALLEL${rst} ${dm}동시 모드${rst}             ${prp}${bld}║${rst}\n"
+  printf "  ${prp}${bld}║${rst}  ${dm}각자 독립 작업 → /pick N 채택${rst}      ${prp}${bld}║${rst}\n"
 }
 
 

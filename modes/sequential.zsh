@@ -157,24 +157,25 @@ EOF
 
 # ── help panel commands ──
 _mode_help_commands() {
-  echo 'printf "  ${prp}${bld}│${rst}  ${cyn}${bld}➡️  순차 모드${rst}                                     ${prp}${bld}│${rst}\n"'
-  echo 'printf "  ${prp}${bld}│${rst}  ${ylw}${bld}/next${rst}    다음 AI${cyn}★${rst}     ${ylw}/skip${rst}    건너뛰기      ${prp}${bld}│${rst}\n"'
-  echo 'printf "  ${prp}${bld}│${rst}  ${ylw}/auto${rst}    자동 전환    ${ylw}/order N${rst} 순서 변경     ${prp}${bld}│${rst}\n"'
-  echo 'printf "  ${prp}${bld}│${rst}  ${dm}/next 지시  /next 3  /auto stop  1→2→...${rst} ${prp}${bld}│${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${cyn}${bld}➡️  순차 모드${rst}                                          ${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}${bld}/next${rst}    다음 AI${cyn}★${rst}      ${ylw}/skip${rst}     건너뛰기      ${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/auto${rst}    자동 전환     ${ylw}/order N${rst} 순서 변경      ${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${dm}/next 지시  /next 3  /auto stop  1→2→3→1...${rst}${prp}${bld}║${rst}\n"'
 }
 
 # ── help panel info section ──
 _mode_help_info() {
   local cnt="$1"
   shift
-  local -a tools=("${(@)@[1,cnt]}")
+  local -a tools=("$@")
   shift $cnt
-  local -a icons=("${(@)@[1,cnt]}")
+  local -a icons=("$@")
+  local -a seq_order
+  # seq_order is passed after icons
   shift $cnt
-  local -a seq_order=("${(@)@[1,cnt]}")
-
+  seq_order=("$@")
   echo 'printf "\n  ${cyn}${bld}📋 실행 순서:${rst}\n"'
-  for ((j=1; j<=$cnt; j++)); do
+  for ((j=1; j<=${#seq_order[@]}; j++)); do
     local oi=${seq_order[$j]}
     echo "printf '   ${j}) ${icons[$oi]} ${tools[$oi]}\n'"
   done
@@ -182,8 +183,8 @@ _mode_help_info() {
 
 # ── cmd center mode header ──
 _mode_cmd_header() {
-  printf "  ${prp}${bld}│${rst}  ${cyn}${bld}➡️  SEQUENTIAL${rst} ${dm}순차 모드${rst}          ${prp}${bld}│${rst}\n"
-  printf "  ${prp}${bld}│${rst}  ${dm}1개 컨텍스트 릴레이 /next 순환${rst}     ${prp}${bld}│${rst}\n"
+  printf "  ${prp}${bld}║${rst}  ${cyn}${bld}➡️  SEQUENTIAL${rst} ${dm}순차 모드${rst}          ${prp}${bld}║${rst}\n"
+  printf "  ${prp}${bld}║${rst}  ${dm}1개 컨텍스트 릴레이 /next 순환${rst}     ${prp}${bld}║${rst}\n"
 }
 
 
