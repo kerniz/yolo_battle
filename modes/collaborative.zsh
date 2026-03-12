@@ -7,7 +7,7 @@ _mode_label="CO-OP (협동)"
 _mode_icon="🤝"
 _mode_color_name="green"
 _mode_needs_order=false
-_mode_input_routing="broadcast"  # send to all AIs
+_mode_input_routing="priority"  # send to highest priority first, then cascade
 
 # ── context setup ──
 _mode_setup_context() {
@@ -54,6 +54,17 @@ _mode_available_role_descs=(
   "아키텍처 설계/구조 결정"
 )
 _mode_available_role_icons=("👑" "🔍" "🛠️" "⚙️" "🧪" "🔧" "👀" "📝" "🎨" "🖥️" "🗄️" "🔒" "♻️" "🔌" "⚡" "♿" "🌐" "📦" "🐛" "🏛️")
+
+# ── role priority mapping (1=구현, 2=검토, 3=테스트/문서) ──
+_mode_role_priority() {
+  local role="$1"
+  case "$role" in
+    "Lead Dev"|Core|Frontend|Backend|DB|API|Debug|Migration) echo 1 ;;
+    Reviewer|Review|Security|Refactor|Perf|Architect)        echo 2 ;;
+    "Test/Ops"|Tests|Config|Docs|A11y|i18n)                  echo 3 ;;
+    *)                                                        echo 1 ;;
+  esac
+}
 
 # default roles (overridden by interactive selection)
 _mode_roles=("Lead Dev" "Reviewer" "Test/Ops")
@@ -126,11 +137,20 @@ EOF
 
 # ── help panel commands ──
 _mode_help_commands() {
-  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}${bld}/merge${rst}   브랜치 머지 ${cyn}★${rst}  ${prp}${bld}║${rst}\n"'
-  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/board${rst}    공유보드 확인    ${prp}${bld}║${rst}\n"'
-  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/swap N M${rst} 역할 교체       ${prp}${bld}║${rst}\n"'
-  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/role N X${rst} 역할 변경       ${prp}${bld}║${rst}\n"'
-  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/roles${rst}    역할 확인        ${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}╠════════════════════════════════╣${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${cyn}협동 모드 명령어${rst}             ${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}╠════════════════════════════════╣${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}${bld}/merge${rst}    브랜치 머지 ${cyn}★${rst}  ${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/board${rst}     공유보드 확인   ${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/swap N M${rst}  역할 교체      ${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/role N X${rst}  역할 변경      ${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/roles${rst}     역할 확인       ${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}╠════════════════════════════════╣${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${cyn}우선순위 캐스케이드${rst}          ${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${dm}P1 구현→P2 검토→P3 테스트${rst} ${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${dm}커맨드→P1전송→안정화 후${rst}   ${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${dm}P2에 커맨드+검토지시 전송${rst}  ${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${dm}제안사항→shared.md 기록${rst}   ${prp}${bld}║${rst}\n"'
 }
 
 # ── help panel info section ──
@@ -151,26 +171,49 @@ _mode_help_info() {
 # ── cmd center mode header ──
 _mode_cmd_header() {
   printf '  ${prp}${bld}║${rst}  ${grn}${bld}🤝 CO-OP${rst} ${dm}협동 모드${rst}                ${prp}${bld}║${rst}\n'
-  printf '  ${prp}${bld}║${rst}  ${dm}역할분리 + 공유보드 + worktree${rst}     ${prp}${bld}║${rst}\n'
+  printf '  ${prp}${bld}║${rst}  ${dm}우선순위 캐스케이드 + 공유보드${rst}     ${prp}${bld}║${rst}\n'
 }
 
 # ── cmd center mode commands ──
 _mode_cmd_commands() {
   printf '  ${prp}${bld}╠══════════════════════════════════════╣${rst}\n'
-  printf '  ${prp}${bld}║${rst}  ${cyn}협동 모드:${rst}                          ${prp}${bld}║${rst}\n'
-  printf '  ${prp}${bld}║${rst}   ${ylw}${bld}/merge${rst}    브랜치 머지 ${cyn}★${rst}        ${prp}${bld}║${rst}\n'
-  printf '  ${prp}${bld}║${rst}   ${ylw}/board${rst}     공유보드 확인          ${prp}${bld}║${rst}\n'
-  printf '  ${prp}${bld}║${rst}   ${ylw}/swap N M${rst}  N↔M 역할 교체        ${prp}${bld}║${rst}\n'
-  printf '  ${prp}${bld}║${rst}   ${ylw}/role N X${rst}  N번 AI 역할 변경     ${prp}${bld}║${rst}\n'
-  printf '  ${prp}${bld}║${rst}   ${ylw}/roles${rst}     현재 역할 확인        ${prp}${bld}║${rst}\n'
+  printf '  ${prp}${bld}║${rst}  ${cyn}협동 모드 명령어:${rst}                    ${prp}${bld}║${rst}\n'
+  printf '  ${prp}${bld}╠══════════════════════════════════════╣${rst}\n'
+  printf '  ${prp}${bld}║${rst}   ${ylw}${bld}/merge${rst}     브랜치 머지 ${cyn}★${rst}       ${prp}${bld}║${rst}\n'
+  printf '  ${prp}${bld}║${rst}   ${ylw}/board${rst}      공유보드 확인         ${prp}${bld}║${rst}\n'
+  printf '  ${prp}${bld}║${rst}   ${ylw}/swap N M${rst}   N↔M 역할 교체       ${prp}${bld}║${rst}\n'
+  printf '  ${prp}${bld}║${rst}   ${ylw}/role N X${rst}   N번 AI 역할 변경    ${prp}${bld}║${rst}\n'
+  printf '  ${prp}${bld}║${rst}   ${ylw}/roles${rst}      현재 역할 확인       ${prp}${bld}║${rst}\n'
+  printf '  ${prp}${bld}╠══════════════════════════════════════╣${rst}\n'
+  printf '  ${prp}${bld}║${rst}  ${cyn}우선순위 캐스케이드:${rst}                  ${prp}${bld}║${rst}\n'
+  printf '  ${prp}${bld}║${rst}   ${dm}P1 구현${rst} → ${dm}P2 검토${rst} → ${dm}P3 테스트${rst}  ${prp}${bld}║${rst}\n'
+  printf '  ${prp}${bld}║${rst}   ${dm}커맨드→P1만 전송, P1 안정화 후${rst}    ${prp}${bld}║${rst}\n'
+  printf '  ${prp}${bld}║${rst}   ${dm}P2에 원래 커맨드+검토지시 전송${rst}    ${prp}${bld}║${rst}\n'
 }
 
 # ── cmd center mode info ──
 _mode_cmd_info() {
-  printf "\n  ${grn}${bld}📋 역할 배정:${rst}\n"
-  for ((r=1; r<=${#_cmd_tools[@]}; r++)); do
-    printf "   ${_cmd_icons[$r]} ${_cmd_tools[$r]}: ${ylw}${_cmd_roles[$r]}${rst}\n"
+  printf "\n  ${grn}${bld}📋 역할 배정 (우선순위):${rst}\n"
+  # 우선순위별로 표시
+  local -a shown=()
+  for _p in 1 2 3; do
+    local label=""
+    case $_p in
+      1) label="구현" ;; 2) label="검토" ;; 3) label="테스트/문서" ;;
+    esac
+    local has_role=false
+    for ((r=1; r<=${#_cmd_tools[@]}; r++)); do
+      local rp=$(_mode_role_priority "${_cmd_roles[$r]}")
+      if [ "$rp" = "$_p" ]; then
+        if ! $has_role; then
+          printf "   ${dm}P${_p} ${label}:${rst}\n"
+          has_role=true
+        fi
+        printf "    ${_cmd_icons[$r]} ${_cmd_tools[$r]}: ${ylw}${_cmd_roles[$r]}${rst}\n"
+      fi
+    done
   done
+  printf "\n  ${ylw}${bld}▶ 커맨드 → P1 먼저 → 안정화 후 P2 → P3 순 캐스케이드${rst}\n"
 }
 
 # ── banner extra info ──
@@ -218,7 +261,11 @@ _mode_do_ctx() {
 # ── help command text ──
 _mode_help_text() {
   printf "\n  ${cyn}${bld}협동 모드:${rst}\n"
-  printf "  ${ylw}/merge${rst}  브랜치 머지  ${ylw}/board${rst}  공유보드 확인\n"
-  printf "  ${ylw}/swap N M${rst} 역할교체  ${ylw}/role N X${rst} 역할변경  ${ylw}/roles${rst} 확인\n"
-  printf "  ${dm}  역할분리 + 공유보드 + worktree 격리${rst}\n"
+  printf "  ${ylw}/merge${rst}     브랜치 머지       ${ylw}/board${rst}  공유보드 확인\n"
+  printf "  ${ylw}/swap N M${rst}  역할교체          ${ylw}/role N X${rst} 역할변경\n"
+  printf "  ${ylw}/roles${rst}     현재 역할 확인\n"
+  printf "\n  ${cyn}${bld}우선순위 캐스케이드:${rst}\n"
+  printf "  ${dm}P1(구현) → P2(검토) → P3(테스트/문서) 순서로 활성화${rst}\n"
+  printf "  ${dm}커맨드 입력 → P1에만 전송 → P1 안정화(10s) 후 P2에 전송${rst}\n"
+  printf "  ${dm}P2 안정화 후 P3에 전송. 원래 커맨드+검토지시 함께 전달${rst}\n"
 }

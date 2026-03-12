@@ -62,8 +62,12 @@ EOF
 
 # ── help panel commands ──
 _mode_help_commands() {
-  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}${bld}/pick N${rst}  N번 AI 채택${cyn}★${rst}  ${prp}${bld}║${rst}\n"'
-  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/compare${rst}  3개 결과 비교   ${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}╠═══════════════════════════════════════════════════╣${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${cyn}동시 모드 명령어${rst}                                  ${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}╠═══════════════════════════════════════════════════╣${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}${bld}/pick N${rst}    직접 채택${cyn}★${rst}   ${ylw}/compare${rst}   결과 비교  ${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/compare N${rst} AI가 선택    ${ylw}/merge N${rst}  AI가 종합  ${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${dm}  완료 감지 후 자동 안내${rst}                          ${prp}${bld}║${rst}\n"'
 }
 
 # ── help panel info section ──
@@ -89,9 +93,13 @@ _mode_cmd_header() {
 # ── cmd center mode commands ──
 _mode_cmd_commands() {
   printf '  ${prp}${bld}╠══════════════════════════════════════╣${rst}\n'
-  printf '  ${prp}${bld}║${rst}  ${cyn}동시 모드:${rst}                          ${prp}${bld}║${rst}\n'
-  printf '  ${prp}${bld}║${rst}   ${ylw}${bld}/pick N${rst}   N번 AI 결과 채택 ${cyn}★${rst}  ${prp}${bld}║${rst}\n'
-  printf '  ${prp}${bld}║${rst}   ${ylw}/compare${rst}   3개 결과 비교         ${prp}${bld}║${rst}\n'
+  printf '  ${prp}${bld}║${rst}  ${cyn}동시 모드 명령어:${rst}                    ${prp}${bld}║${rst}\n'
+  printf '  ${prp}${bld}╠══════════════════════════════════════╣${rst}\n'
+  printf '  ${prp}${bld}║${rst}  ${ylw}${bld}/pick N${rst}   직접 채택${cyn}★${rst}             ${prp}${bld}║${rst}\n'
+  printf '  ${prp}${bld}║${rst}  ${ylw}/compare${rst}   결과 비교 테이블        ${prp}${bld}║${rst}\n'
+  printf '  ${prp}${bld}║${rst}  ${ylw}/compare N${rst} N번 AI가 최적 선택     ${prp}${bld}║${rst}\n'
+  printf '  ${prp}${bld}║${rst}  ${ylw}/merge N${rst}   N번 AI가 결과 종합     ${prp}${bld}║${rst}\n'
+  printf '  ${prp}${bld}║${rst}  ${dm}  완료 감지 후 자동 안내 표시${rst}       ${prp}${bld}║${rst}\n'
 }
 
 # ── cmd center mode info ──
@@ -100,7 +108,7 @@ _mode_cmd_info() {
   for ((r=1; r<=${#_cmd_tools[@]}; r++)); do
     printf "   context_${_cmd_tools[$r]}.md\n"
   done
-  printf "\n  ${ylw}${bld}▶ 모든 AI 동시 시작. /pick N 으로 최종 채택${rst}\n"
+  printf "\n  ${ylw}${bld}▶ 모든 AI 동시 작업 → 완료 감지 → /pick·/compare·/merge${rst}\n"
 }
 
 # ── banner extra info ──
@@ -138,6 +146,9 @@ _mode_do_ctx() {
 # ── help command text ──
 _mode_help_text() {
   printf "\n  ${cyn}${bld}동시 모드:${rst}\n"
-  printf "  ${ylw}/compare${rst} 3개 결과 비교  ${ylw}/pick N${rst} N번 AI 채택\n"
-  printf "  ${dm}  각 AI 독립 컨텍스트, 서로 열람 가능${rst}\n"
+  printf "  ${ylw}/pick N${rst}     사용자가 N번 AI 결과 직접 채택\n"
+  printf "  ${ylw}/compare${rst}    결과 비교 테이블 표시\n"
+  printf "  ${ylw}/compare N${rst}  N번 AI가 다른 결과 비교 후 최적 선택\n"
+  printf "  ${ylw}/merge N${rst}    N번 AI가 모든 결과 종합하여 최종본 작성\n"
+  printf "  ${dm}  모든 AI 완료 시 자동 안내 │ 각 AI 독립 컨텍스트${rst}\n"
 }

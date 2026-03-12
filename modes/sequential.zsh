@@ -157,9 +157,21 @@ EOF
 
 # ── help panel commands ──
 _mode_help_commands() {
-  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}${bld}/next X${rst}   라운드로빈${cyn}★${rst}    ${prp}${bld}║${rst}\n"'
-  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/skip${rst}     건너뛰기         ${prp}${bld}║${rst}\n"'
-  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/order N${rst}  순서 변경       ${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}╠════════════════════════════════╣${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${cyn}순차 모드 명령어${rst}             ${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}╠════════════════════════════════╣${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}${bld}/next${rst}       다음 AI 전환${cyn}★${rst} ${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${dm}  /next${rst}      ${dm}다음 턴으로 전환${rst}${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${dm}  /next 작업내용${rst} ${dm}+지시 전달${rst}${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${dm}  /next 3${rst}    ${dm}3턴 연속 넘기기${rst}${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/skip${rst}       건너뛰기+활성화 ${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${dm}  현재 AI 결과 무시, 다음 전환${rst}${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/auto${rst} ${dm}[N]${rst}   자동 전환 시작  ${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${dm}  /auto${rst}      ${dm}10초 안정화 후 전환${rst}${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${dm}  /auto 5${rst}    ${dm}5초 안정화 후 전환${rst}${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${dm}  /auto stop${rst} ${dm}자동 전환 중지${rst}  ${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/order N..${rst}  순서 변경       ${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${dm}  /order 2 1 3${rst} ${dm}순서 재배치${rst} ${prp}${bld}║${rst}\n"'
   echo 'printf "  ${prp}${bld}║${rst}  ${dm}  1→2→3→1→... 무한순환${rst}   ${prp}${bld}║${rst}\n"'
 }
 
@@ -190,10 +202,20 @@ _mode_cmd_header() {
 # ── cmd center mode commands ──
 _mode_cmd_commands() {
   printf '  ${prp}${bld}╠══════════════════════════════════════╣${rst}\n'
-  printf '  ${prp}${bld}║${rst}  ${cyn}순차 모드:${rst}                          ${prp}${bld}║${rst}\n'
-  printf '  ${prp}${bld}║${rst}   ${ylw}${bld}/next X${rst}    라운드로빈 ${cyn}★${rst}        ${prp}${bld}║${rst}\n'
-  printf '  ${prp}${bld}║${rst}   ${ylw}/skip${rst}      건너뛰기              ${prp}${bld}║${rst}\n'
-  printf '  ${prp}${bld}║${rst}   ${ylw}/order N..${rst} 순서 변경 ${dm}(예:2 1 3)${rst}${prp}${bld}║${rst}\n'
+  printf '  ${prp}${bld}║${rst}  ${cyn}순차 모드 명령어:${rst}                    ${prp}${bld}║${rst}\n'
+  printf '  ${prp}${bld}╠══════════════════════════════════════╣${rst}\n'
+  printf '  ${prp}${bld}║${rst}   ${ylw}${bld}/next${rst}         다음 AI 전환 ${cyn}★${rst}    ${prp}${bld}║${rst}\n'
+  printf '  ${prp}${bld}║${rst}   ${dm}  /next${rst}         ${dm}다음 턴으로 전환${rst}  ${prp}${bld}║${rst}\n'
+  printf '  ${prp}${bld}║${rst}   ${dm}  /next 작업지시${rst}  ${dm}+메시지 전달${rst}   ${prp}${bld}║${rst}\n'
+  printf '  ${prp}${bld}║${rst}   ${dm}  /next 3${rst}       ${dm}3턴 연속 넘기기${rst} ${prp}${bld}║${rst}\n'
+  printf '  ${prp}${bld}║${rst}   ${ylw}/skip${rst}         건너뛰기+활성화     ${prp}${bld}║${rst}\n'
+  printf '  ${prp}${bld}║${rst}   ${dm}  현재 AI 결과 무시, 다음으로 전환${rst}${prp}${bld}║${rst}\n'
+  printf '  ${prp}${bld}║${rst}   ${ylw}/auto${rst} ${dm}[N]${rst}      자동 전환         ${prp}${bld}║${rst}\n'
+  printf '  ${prp}${bld}║${rst}   ${dm}  /auto${rst}         ${dm}10초 안정화→전환${rst} ${prp}${bld}║${rst}\n'
+  printf '  ${prp}${bld}║${rst}   ${dm}  /auto 5${rst}       ${dm}5초 안정화→전환${rst}  ${prp}${bld}║${rst}\n'
+  printf '  ${prp}${bld}║${rst}   ${dm}  /auto stop${rst}    ${dm}자동 전환 중지${rst}  ${prp}${bld}║${rst}\n'
+  printf '  ${prp}${bld}║${rst}   ${ylw}/order N..${rst}    순서 변경            ${prp}${bld}║${rst}\n'
+  printf '  ${prp}${bld}║${rst}   ${dm}  /order 2 1 3${rst}  ${dm}순서 재배치${rst}    ${prp}${bld}║${rst}\n'
   printf '  ${prp}${bld}║${rst}   ${dm}  1→2→3→1→... 무한 라운드로빈${rst}  ${prp}${bld}║${rst}\n'
 }
 
@@ -232,8 +254,16 @@ _mode_do_ctx() {
 
 # ── help command text ──
 _mode_help_text() {
-  printf "\n  ${cyn}${bld}순차 모드:${rst}\n"
-  printf "  ${ylw}/next X${rst} 라운드로빈 다음 AI (컨텍스트 저장+자동전송)\n"
-  printf "  ${ylw}/skip${rst}   건너뛰기  ${ylw}/order N..${rst} 순서변경\n"
+  printf "\n  ${cyn}${bld}순차 모드 명령어:${rst}\n"
+  printf "  ${ylw}${bld}/next${rst}          다음 AI로 턴 전환 (컨텍스트 저장+relay 전송)\n"
+  printf "  ${dm}  /next${rst}          ${dm}— 다음 턴으로 전환${rst}\n"
+  printf "  ${dm}  /next 버그 수정${rst} ${dm}— 다음 AI에게 '버그 수정' 지시 전달${rst}\n"
+  printf "  ${dm}  /next 3${rst}        ${dm}— 3턴 연속 넘기기 (한 바퀴 순환 등)${rst}\n"
+  printf "  ${ylw}/skip${rst}           현재 AI 건너뛰기 (결과 무시, 다음 AI 활성화)\n"
+  printf "  ${ylw}/auto${rst} ${dm}[N]${rst}       context 변경 감지 → N초 안정화 후 자동 /next\n"
+  printf "  ${dm}  /auto${rst}          ${dm}— 기본 10초 안정화${rst}\n"
+  printf "  ${dm}  /auto 5${rst}        ${dm}— 5초 안정화 후 전환${rst}\n"
+  printf "  ${dm}  /auto stop${rst}     ${dm}— 자동 전환 중지${rst}\n"
+  printf "  ${ylw}/order N..${rst}      순서 변경 ${dm}(예: /order 2 1 3)${rst}\n"
   printf "  ${dm}  1→2→3→1→... 무한 라운드로빈, /quit으로 종료${rst}\n"
 }

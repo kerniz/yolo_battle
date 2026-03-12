@@ -429,6 +429,11 @@ _yolo_battle() {
     printf "\n"
 
     _mode_roles=("${_roles[@]}")
+
+    # persist role names for status bar monitor
+    for ((j=1; j<=$cnt; j++)); do
+      printf '%s' "${_roles[$j]}" > "$tmpdir/role_${_yolo_opts[$j]}.txt"
+    done
   fi
 
   if [ -n "$prompt" ]; then
@@ -723,33 +728,25 @@ DONE_END
     echo ""
     echo 'clear'
     echo 'printf "\n"'
-    echo 'printf "  ${prp}${bld}╔════════════════════════════════╗${rst}\n"'
-    echo 'printf "  ${prp}${bld}║${rst}  ${cyn}명령어${rst}                       ${prp}${bld}║${rst}\n"'
-    echo 'printf "  ${prp}${bld}╠════════════════════════════════╣${rst}\n"'
-    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/status${rst}   각 AI 상태 확인   ${prp}${bld}║${rst}\n"'
-    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/diff${rst}     변경사항 확인     ${prp}${bld}║${rst}\n"'
-    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/save${rst}     결과 저장         ${prp}${bld}║${rst}\n"'
-    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/ctx${rst}      컨텍스트 확인     ${prp}${bld}║${rst}\n"'
-    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/prompt X${rst} 프롬프트 변경     ${prp}${bld}║${rst}\n"'
-    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/focus N${rst}  N번 pane 포커스   ${prp}${bld}║${rst}\n"'
+    echo 'printf "  ${prp}${bld}╔═══════════════════════════════════════════════════╗${rst}\n"'
+    echo 'printf "  ${prp}${bld}║${rst}  ${cyn}공통 명령어${rst}                                      ${prp}${bld}║${rst}\n"'
+    echo 'printf "  ${prp}${bld}╠═══════════════════════════════════════════════════╣${rst}\n"'
+    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/status${rst}  상태 확인    ${ylw}/diff${rst}     변경사항     ${prp}${bld}║${rst}\n"'
+    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/save${rst}    결과 저장    ${ylw}/ctx${rst}      컨텍스트     ${prp}${bld}║${rst}\n"'
+    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/focus N${rst} pane 포커스  ${ylw}/prompt X${rst} 프롬프트     ${prp}${bld}║${rst}\n"'
+    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/cat F${rst}   파일 비교    ${ylw}/grep P${rst}   파일 검색    ${prp}${bld}║${rst}\n"'
+    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/mode X${rst} 모드변경${dm}(p/s/c)${rst} ${ylw}/history${rst} 기록   ${prp}${bld}║${rst}\n"'
+    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/help${rst}    도움말       ${ylw}/quit${rst}     세션 종료    ${prp}${bld}║${rst}\n"'
 
     # mode-specific help commands (from mode skill)
     _mode_help_commands
 
-    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/mode X${rst}   모드 변경 ${dm}(p/s/c)${rst}${prp}${bld}║${rst}\n"'
-    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/help${rst}     도움말            ${prp}${bld}║${rst}\n"'
-    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/cat FILE${rst}  파일 내용 비교     ${prp}${bld}║${rst}\n"'
-    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/grep PAT${rst}   파일 내용 검색     ${prp}${bld}║${rst}\n"'
-    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/history${rst}   명령어 기록       ${prp}${bld}║${rst}\n"'
-    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/quit${rst}     세션 종료         ${prp}${bld}║${rst}\n"'
-    echo 'printf "  ${prp}${bld}╠════════════════════════════════╣${rst}\n"'
-    echo 'printf "  ${prp}${bld}║${rst}  ${cyn}단축키${rst}                       ${prp}${bld}║${rst}\n"'
-    echo 'printf "  ${prp}${bld}╠════════════════════════════════╣${rst}\n"'
-    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}Ctrl+B → 방향키${rst} pane 이동   ${prp}${bld}║${rst}\n"'
-    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}Ctrl+B → z${rst}     풀스크린     ${prp}${bld}║${rst}\n"'
-    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}Ctrl+B → S${rst}     동기화       ${prp}${bld}║${rst}\n"'
-    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}Ctrl+B → d${rst}     세션 나가기   ${prp}${bld}║${rst}\n"'
-    echo 'printf "  ${prp}${bld}╚════════════════════════════════╝${rst}\n"'
+    echo 'printf "  ${prp}${bld}╠═══════════════════════════════════════════════════╣${rst}\n"'
+    echo 'printf "  ${prp}${bld}║${rst}  ${cyn}단축키${rst}                                          ${prp}${bld}║${rst}\n"'
+    echo 'printf "  ${prp}${bld}╠═══════════════════════════════════════════════════╣${rst}\n"'
+    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}Ctrl+B → 방향키${rst} pane이동  ${ylw}Ctrl+B → z${rst} 풀스크린${prp}${bld}║${rst}\n"'
+    echo 'printf "  ${prp}${bld}║${rst}  ${ylw}Ctrl+B → S${rst}     동기화    ${ylw}Ctrl+B → d${rst} 나가기  ${prp}${bld}║${rst}\n"'
+    echo 'printf "  ${prp}${bld}╚═══════════════════════════════════════════════════╝${rst}\n"'
 
     # mode-specific info section (from mode skill)
     _mode_help_info "$cnt" "${_yolo_opts[@]}" "${_yolo_icons[@]}" "${_seq_order[@]}" "${_roles[@]}"
@@ -827,25 +824,21 @@ else
 
   printf "  ${prp}${bld}╠══════════════════════════════════════╣${rst}\n"
   printf "  ${prp}${bld}║${rst}  ${cyn}공통 명령어:${rst}                        ${prp}${bld}║${rst}\n"
-  printf "  ${prp}${bld}║${rst}   ${ylw}/status${rst}    각 AI 상태 확인        ${prp}${bld}║${rst}\n"
-  printf "  ${prp}${bld}║${rst}   ${ylw}/diff${rst}      각 AI 변경사항 확인   ${prp}${bld}║${rst}\n"
-  printf "  ${prp}${bld}║${rst}   ${ylw}/save${rst}      결과 저장              ${prp}${bld}║${rst}\n"
-  printf "  ${prp}${bld}║${rst}   ${ylw}/ctx${rst}       컨텍스트 확인          ${prp}${bld}║${rst}\n"
-  printf "  ${prp}${bld}║${rst}   ${ylw}/prompt X${rst}  프롬프트 변경          ${prp}${bld}║${rst}\n"
-  printf "  ${prp}${bld}║${rst}   ${ylw}/focus N${rst}   N번 pane 포커스        ${prp}${bld}║${rst}\n"
+  printf "  ${prp}${bld}╠══════════════════════════════════════╣${rst}\n"
+  printf "  ${prp}${bld}║${rst}  ${ylw}/status${rst} 상태   ${ylw}/diff${rst}   변경사항  ${prp}${bld}║${rst}\n"
+  printf "  ${prp}${bld}║${rst}  ${ylw}/save${rst}   저장   ${ylw}/ctx${rst}    컨텍스트  ${prp}${bld}║${rst}\n"
+  printf "  ${prp}${bld}║${rst}  ${ylw}/focus N${rst} 포커스 ${ylw}/prompt X${rst} 프롬프트${prp}${bld}║${rst}\n"
+  printf "  ${prp}${bld}║${rst}  ${ylw}/cat F${rst}  비교   ${ylw}/grep P${rst}  검색     ${prp}${bld}║${rst}\n"
 
   _mode_cmd_commands
 
   printf "  ${prp}${bld}╠══════════════════════════════════════╣${rst}\n"
-  printf "  ${prp}${bld}║${rst}   ${ylw}/mode X${rst}    모드 변경 ${dm}(p/s/c)${rst}   ${prp}${bld}║${rst}\n"
-  printf "  ${prp}${bld}║${rst}   ${ylw}/help${rst}      도움말                ${prp}${bld}║${rst}\n"
-  printf "  ${prp}${bld}║${rst}   ${ylw}/quit${rst}      세션 종료              ${prp}${bld}║${rst}\n"
+  printf "  ${prp}${bld}║${rst}  ${ylw}/mode X${rst} 모드${dm}(p/s/c)${rst} ${ylw}/help${rst} 도움말${prp}${bld}║${rst}\n"
+  printf "  ${prp}${bld}║${rst}  ${ylw}/history${rst} 기록    ${ylw}/quit${rst} 종료     ${prp}${bld}║${rst}\n"
   printf "  ${prp}${bld}╠══════════════════════════════════════╣${rst}\n"
   printf "  ${prp}${bld}║${rst}  ${cyn}단축키:${rst}                            ${prp}${bld}║${rst}\n"
-  printf "  ${prp}${bld}║${rst}   ${ylw}Ctrl+B → 방향키${rst}  pane 이동        ${prp}${bld}║${rst}\n"
-  printf "  ${prp}${bld}║${rst}   ${ylw}Ctrl+B → z${rst}      풀스크린 토글     ${prp}${bld}║${rst}\n"
-  printf "  ${prp}${bld}║${rst}   ${ylw}Ctrl+B → S${rst}      동기화 토글       ${prp}${bld}║${rst}\n"
-  printf "  ${prp}${bld}║${rst}   ${ylw}Ctrl+B → d${rst}      세션 나가기       ${prp}${bld}║${rst}\n"
+  printf "  ${prp}${bld}║${rst}  ${ylw}C-B 방향키${rst} 이동 ${ylw}C-B z${rst} 풀스크린 ${prp}${bld}║${rst}\n"
+  printf "  ${prp}${bld}║${rst}  ${ylw}C-B S${rst} 동기화    ${ylw}C-B d${rst} 나가기   ${prp}${bld}║${rst}\n"
   printf "  ${prp}${bld}╚══════════════════════════════════════╝${rst}\n"
 
   _mode_cmd_info "$_cmd_tools[@]" "$_cmd_seq_order[@]" "$_cmd_icons[@]"
@@ -1086,8 +1079,25 @@ _do_skip() {
   fi
   echo "$next" > "$tmpdir/seq_turn.txt"
   local next_tool_idx=${_cmd_seq_order[$next]}
+  local next_pane="${ai_panes[$next_tool_idx]}"
+  local next_tool="${_cmd_tools[$next_tool_idx]}"
   printf "  ${ylw}⏭ 건너뜀${rst}\n"
-  printf "  ${cyn}${bld}▶ R${round}:T${next} ${_cmd_icons[$next_tool_idx]} ${_cmd_tools[$next_tool_idx]} 활성화${rst}\n"
+  printf "  ${cyn}${bld}▶ R${round}:T${next} ${_cmd_icons[$next_tool_idx]} ${next_tool} 활성화${rst}\n"
+
+  # relay 메시지 전송 (다음 AI 활성화)
+  local last_cmd="$_last_user_cmd"
+  if [ -z "$last_cmd" ]; then
+    last_cmd=$(cat "$tmpdir/user_cmd.txt" 2>/dev/null)
+  fi
+  local ctx_msg="반드시 ${tmpdir}/context.md 를 열어 최신 입력을 확인한 뒤 즉시 응답하세요(추가 질문 금지). 1턴 1작업 규칙을 지키고, 결과를 context.md에 기록하세요. 이어서 작업: ${last_cmd}"
+  printf '%s' "$ctx_msg" > "$tmpdir/prompt.txt"
+
+  if [ -f "$tmpdir/started_${next_tool}.txt" ]; then
+    printf "  ${dm}→ ${_cmd_icons[$next_tool_idx]} ${next_tool} pane에 relay 전송${rst}\n"
+    _send_to_pane "${next_pane}" "${next_tool}" "$ctx_msg"
+  else
+    printf "  ${dm}→ ${_cmd_icons[$next_tool_idx]} ${next_tool} 프롬프트 갱신됨${rst}\n"
+  fi
 }
 
 # ════════════════════════════════════════
@@ -1142,10 +1152,44 @@ _do_pick() {
 # /compare - 동시 모드 결과 비교
 # ════════════════════════════════════════
 _do_compare() {
+  local compare_ai="$1"
+
   if [[ "$mode" != "parallel" ]]; then
     printf "  ${red}동시 모드에서만 사용 가능합니다${rst}\n"
     return
   fi
+
+  # /compare N — N번 AI가 다른 AI 결과를 비교해서 하나 선택
+  if [ -n "$compare_ai" ] && [[ "$compare_ai" =~ ^[0-9]+$ ]]; then
+    if [ "$compare_ai" -lt 1 ] || [ "$compare_ai" -gt ${#_cmd_tools[@]} ]; then
+      printf "  ${red}사용법: /compare N (1~${#_cmd_tools[@]})${rst}\n"
+      return
+    fi
+    local cai_tool="${_cmd_tools[$compare_ai]}"
+    local cai_icon="${_cmd_icons[$compare_ai]}"
+    local cai_pane="${ai_panes[$compare_ai]}"
+
+    # 다른 AI들의 컨텍스트/diff 정보 수집
+    local others_info=""
+    for ((ci=1; ci<=${#_cmd_tools[@]}; ci++)); do
+      [ "$ci" -eq "$compare_ai" ] && continue
+      local oname="${_cmd_tools[$ci]}"
+      local ofile="$tmpdir/context_${oname}.md"
+      local odfile="$tmpdir/diff_${oname}.txt"
+      others_info="${others_info}[${oname}: context=${ofile}"
+      [ -f "$odfile" ] && others_info="${others_info}, diff=${odfile}"
+      others_info="${others_info}] "
+    done
+
+    local compare_msg="다른 AI들의 작업 결과를 비교 분석하세요. ${others_info} 각 AI의 context 파일과 diff를 읽고, 가장 좋은 결과물을 하나 선택하세요. 선택 이유와 함께 어떤 AI의 결과가 최적인지 shared.md에 기록하세요."
+
+    _send_to_pane "${cai_pane}" "${cai_tool}" "$compare_msg"
+    printf "  ${cyn}${bld}📊 ${cai_icon} ${cai_tool}에게 비교 분석 요청${rst}\n"
+    printf "  ${dm}→ 다른 AI 결과를 비교하여 최적 선택 후 shared.md에 기록${rst}\n"
+    return
+  fi
+
+  # /compare (인자 없음) — 기존 비교 테이블 표시
   printf "\n  ${cyn}${bld}📊 AI 결과 비교${rst}\n"
   printf "  ${dm}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${rst}\n"
 
@@ -1181,7 +1225,7 @@ _do_compare() {
       printf "    ${dm}(변경 없음)${rst}\n"
     fi
 
-    # show last 5 lines of pane output
+    # show last lines of pane output
     local pane="${ai_panes[$ci]}"
     local pout=$(tmux capture-pane -t "${pane}" -p -S -10 2>/dev/null | sed '/^[[:space:]]*$/d' | tail -3)
     if [ -n "$pout" ]; then
@@ -1191,7 +1235,7 @@ _do_compare() {
     fi
   done
 
-  printf "\n  ${ylw}${bld}/pick N${rst} ${dm}으로 채택하세요 (1~${#_cmd_tools[@]})${rst}\n\n"
+  printf "\n  ${ylw}${bld}/pick N${rst} 직접 채택  ${ylw}${bld}/compare N${rst} AI가 선택  ${ylw}${bld}/merge N${rst} AI가 종합\n\n"
 }
 
 # ════════════════════════════════════════
@@ -1213,6 +1257,58 @@ _do_board() {
     printf "  ${dm}(비어 있음 - AI가 작업 내용을 기록하면 여기에 표시됩니다)${rst}\n"
   fi
   printf "\n"
+}
+
+# ════════════════════════════════════════
+# /clear - 화면 지우기
+# ════════════════════════════════════════
+_do_clear() {
+  printf "\033[H\033[2J"
+  _show_status
+}
+
+# ════════════════════════════════════════
+# /dash - 전체화면 대시보드
+# ════════════════════════════════════════
+_do_dashboard() {
+  printf "\033[H\033[2J"
+  printf "  ${prp}${bld}┏━━━━━━━━━━━━━━━━━ BATTLE DASHBOARD ━━━━━━━━━━━━━━━━━┓${rst}\n"
+
+  # 1. AI 상태
+  printf "  ${prp}${bld}┃${rst} ${grn}${bld}📊 AI Status${rst}                                       ${prp}${bld}┃${rst}\n"
+  for ((pi=1; pi<=${#_cmd_tools[@]}; pi++)); do
+    local pname="${_cmd_tools[$pi]}"
+    local picon="${_cmd_icons[$pi]}"
+    local pstatus=$(cat "$tmpdir/status_${pname}" 2>/dev/null)
+    local prole=""
+    [[ "$mode" == "collaborative" ]] && prole=" (${_cmd_roles[$pi]:-})"
+    local scolor="${dm}" stxt="--"
+    case "$pstatus" in
+      done:*)  scolor="${grn}"; stxt="✔ ${pstatus#done:}" ;;
+      running) scolor="${ylw}"; stxt="⣾ 작업중" ;;
+      waiting) scolor="${dm}";  stxt="⏳ 대기" ;;
+    esac
+    printf "  ${prp}${bld}┃${rst}   ${picon} %-10s${ylw}%-14s${rst} ${scolor}%-16s${rst}  ${prp}${bld}┃${rst}\n" "$pname" "$prole" "$stxt"
+  done
+
+  printf "  ${prp}${bld}┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫${rst}\n"
+
+  # 2. 최근 활동 (shared.md)
+  printf "  ${prp}${bld}┃${rst} ${ylw}${bld}📝 Recent Activity${rst}                                 ${prp}${bld}┃${rst}\n"
+  local sfile="$tmpdir/shared.md"
+  if [ -f "$sfile" ] && [ -s "$sfile" ]; then
+    grep -v "^#" "$sfile" | grep -v "^---" | sed '/^[[:space:]]*$/d' | tail -5 | while IFS= read -r sl; do
+      printf "  ${prp}${bld}┃${rst}  ${dm}%-49s${rst}${prp}${bld}┃${rst}\n" "${sl:0:49}"
+    done
+  else
+    printf "  ${prp}${bld}┃${rst} ${dm}    (No recent activity)${rst}                          ${prp}${bld}┃${rst}\n"
+  fi
+
+  printf "  ${prp}${bld}┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛${rst}\n"
+  printf "\n  ${dm}아무 키를 누르면 돌아갑니다...${rst}"
+  read -rs -k1
+  printf "\033[H\033[2J"
+  _show_status
 }
 
 _do_swap() {
@@ -1302,8 +1398,41 @@ _do_mode_switch() {
 }
 
 _do_merge() {
+  local merge_ai="$1"
+
+  # ── 동시 모드: /merge N → N번 AI가 모든 결과 종합 ──
+  if [[ "$mode" == "parallel" ]]; then
+    if [ -z "$merge_ai" ] || ! [[ "$merge_ai" =~ ^[0-9]+$ ]] || [ "$merge_ai" -lt 1 ] || [ "$merge_ai" -gt ${#_cmd_tools[@]} ]; then
+      printf "  ${red}사용법: /merge N (1~${#_cmd_tools[@]}) — N번 AI가 모든 결과 종합${rst}\n"
+      return
+    fi
+    local mai_tool="${_cmd_tools[$merge_ai]}"
+    local mai_icon="${_cmd_icons[$merge_ai]}"
+    local mai_pane="${ai_panes[$merge_ai]}"
+
+    # 다른 AI들의 컨텍스트/diff 정보 수집
+    local others_info=""
+    for ((mi=1; mi<=${#_cmd_tools[@]}; mi++)); do
+      [ "$mi" -eq "$merge_ai" ] && continue
+      local oname="${_cmd_tools[$mi]}"
+      local ofile="$tmpdir/context_${oname}.md"
+      local odfile="$tmpdir/diff_${oname}.txt"
+      others_info="${others_info}[${oname}: context=${ofile}"
+      [ -f "$odfile" ] && others_info="${others_info}, diff=${odfile}"
+      others_info="${others_info}] "
+    done
+
+    local merge_msg="다른 AI들의 작업 결과를 모두 분석하고 종합하세요. ${others_info} 각 AI의 context 파일과 diff를 읽고, 모든 AI의 좋은 부분을 합쳐서 최종 결과물을 만드세요. 종합 결과와 각 AI에서 가져온 부분을 shared.md에 기록하세요."
+
+    _send_to_pane "${mai_pane}" "${mai_tool}" "$merge_msg"
+    printf "  ${grn}${bld}🔀 ${mai_icon} ${mai_tool}에게 종합 요청${rst}\n"
+    printf "  ${dm}→ 모든 AI 결과를 분석하여 최종본 작성 후 shared.md에 기록${rst}\n"
+    return
+  fi
+
+  # ── 협동 모드: git branch merge ──
   if [[ "$mode" != "collaborative" ]]; then
-    printf "  ${red}co-op 모드에서만 사용 가능합니다${rst}\n"
+    printf "  ${red}동시/co-op 모드에서만 사용 가능합니다${rst}\n"
     return
   fi
   cd "$workdir"
@@ -1497,6 +1626,198 @@ _auto_stop() {
 }
 
 # ════════════════════════════════════════
+# PRIORITY WATCHER (협동 모드 우선순위 캐스케이드)
+# ════════════════════════════════════════
+_priority_watcher_pid=""
+
+_priority_watcher_stop() {
+  if [ -n "$_priority_watcher_pid" ] && kill -0 "$_priority_watcher_pid" 2>/dev/null; then
+    kill "$_priority_watcher_pid" 2>/dev/null
+    wait "$_priority_watcher_pid" 2>/dev/null
+  fi
+  _priority_watcher_pid=""
+}
+
+# 역할 → 우선순위 (collaborative.zsh의 _mode_role_priority 재사용)
+_get_role_priority() {
+  local role="$1"
+  case "$role" in
+    "Lead Dev"|Core|Frontend|Backend|DB|API|Debug|Migration) echo 1 ;;
+    Reviewer|Review|Security|Refactor|Perf|Architect)        echo 2 ;;
+    "Test/Ops"|Tests|Config|Docs|A11y|i18n)                  echo 3 ;;
+    *)                                                        echo 1 ;;
+  esac
+}
+
+# AI 목록을 우선순위로 정렬하여 인덱스 배열 반환
+_get_priority_sorted_indices() {
+  local -a pairs=()
+  for ((pi=1; pi<=${#_cmd_tools[@]}; pi++)); do
+    local p=$(_get_role_priority "${_cmd_roles[$pi]}")
+    pairs+=("${p}:${pi}")
+  done
+  echo "${(j: :)${(@o)pairs}}" | tr ' ' '\n' | while IFS=: read -r _p _i; do
+    printf "%s " "$_i"
+  done
+}
+
+# 우선순위 캐스케이드 워처 시작
+_priority_watcher_start() {
+  local user_cmd="$1"
+  local settle=10
+  _priority_watcher_stop
+
+  # 우선순위 정렬된 인덱스 목록
+  local sorted_indices=($(_get_priority_sorted_indices))
+  local total=${#sorted_indices[@]}
+
+  # 1순위에만 원래 커맨드 전송
+  local first_idx=${sorted_indices[1]}
+  local first_pane="${ai_panes[$first_idx]}"
+  local first_tool="${_cmd_tools[$first_idx]}"
+  local first_pri=$(_get_role_priority "${_cmd_roles[$first_idx]}")
+  _send_to_pane "${first_pane}" "${first_tool}" "$user_cmd"
+  printf "  ${grn}${bld}▶ P${first_pri} ${_cmd_icons[$first_idx]} ${first_tool}${rst} ${dm}← 커맨드 전송${rst}\n"
+
+  if [ "$total" -le 1 ]; then
+    return
+  fi
+
+  # 나머지를 큐 파일에 기록
+  : > "$tmpdir/priority_queue.txt"
+  for ((qi=2; qi<=total; qi++)); do
+    echo "${sorted_indices[$qi]}" >> "$tmpdir/priority_queue.txt"
+  done
+  printf '%s' "$user_cmd" > "$tmpdir/priority_user_cmd.txt"
+
+  # 백그라운드 워처: pane 안정화 감지 → 다음 순위 활성화
+  (
+    local watch_idx=$first_idx
+    local watch_pane=$first_pane
+    local watch_tool=$first_tool
+    local last_pane_hash=""
+    local last_pane_change_ts=$(date +%s)
+
+    while true; do
+      sleep 2
+
+      # pane hash 계산
+      local cur_pane_hash=""
+      local pane_out=$(tmux capture-pane -t "${watch_pane}" -p -S -30 2>/dev/null | sed '/^[[:space:]]*$/d' | tail -n 30)
+      if [ -n "$pane_out" ]; then
+        cur_pane_hash=$(printf '%s' "$pane_out" | shasum -a 256 | awk '{print $1}')
+      fi
+
+      # pane 변경 시 타임스탬프 갱신
+      if [ -n "$cur_pane_hash" ] && [[ "$cur_pane_hash" != "$last_pane_hash" ]]; then
+        last_pane_hash="$cur_pane_hash"
+        last_pane_change_ts=$(date +%s)
+      fi
+
+      # settle 체크
+      local now=$(date +%s)
+      local pane_stable_secs=$(( now - last_pane_change_ts ))
+
+      if (( pane_stable_secs >= settle )); then
+        # 큐에서 다음 AI 꺼내기
+        local next_qi=$(head -1 "$tmpdir/priority_queue.txt" 2>/dev/null)
+
+        if [ -z "$next_qi" ]; then
+          # 큐 비었음 = 마지막 AI도 안정화 완료 → 커맨드 완료
+          local orig_cmd=$(cat "$tmpdir/priority_user_cmd.txt" 2>/dev/null)
+          printf "\n  ${grn}${bld}✔ 커맨드 완료${rst} ${dm}— 모든 우선순위 AI 작업 완료${rst}\n"
+          printf "  ${dm}  \"%.40s...\"${rst}\n" "$orig_cmd"
+          printf '\a'  # Terminal Bell
+          break
+        fi
+
+        # 큐에서 첫 줄 제거
+        tail -n +2 "$tmpdir/priority_queue.txt" > "$tmpdir/priority_queue.tmp" 2>/dev/null
+        mv "$tmpdir/priority_queue.tmp" "$tmpdir/priority_queue.txt" 2>/dev/null
+
+        local next_pane="${ai_panes[$next_qi]}"
+        local next_tool="${_cmd_tools[$next_qi]}"
+        local next_pri=$(_get_role_priority "${_cmd_roles[$next_qi]}")
+        local orig_cmd=$(cat "$tmpdir/priority_user_cmd.txt" 2>/dev/null)
+        local relay_msg="${orig_cmd}. shared.md 확인하고 역할에 맞게 작업을 수행하세요. 추천 및 제안사항이 있는 경우 shared.md에 남기세요."
+
+        _send_to_pane "${next_pane}" "${next_tool}" "$relay_msg"
+        printf "\n  ${grn}${bld}▶ P${next_pri} ${_cmd_icons[$next_qi]} ${next_tool}${rst} ${dm}← 캐스케이드 활성화 (${watch_tool} 안정화 ${settle}s)${rst}\n"
+
+        # 다음 감시 대상으로 전환
+        watch_idx=$next_qi
+        watch_pane=$next_pane
+        watch_tool=$next_tool
+        last_pane_hash=""
+        last_pane_change_ts=$(date +%s)
+      fi
+    done
+  ) &
+  _priority_watcher_pid=$!
+  printf "  ${dm}→ 우선순위 캐스케이드 워처 시작 (settle=${settle}s)${rst}\n"
+}
+
+# ════════════════════════════════════════
+# PARALLEL COMPLETION WATCHER (동시 모드 전체 완료 감지)
+# ════════════════════════════════════════
+_parallel_watcher_pid=""
+
+_parallel_watcher_stop() {
+  if [ -n "$_parallel_watcher_pid" ] && kill -0 "$_parallel_watcher_pid" 2>/dev/null; then
+    kill "$_parallel_watcher_pid" 2>/dev/null
+    wait "$_parallel_watcher_pid" 2>/dev/null
+  fi
+  _parallel_watcher_pid=""
+}
+
+_parallel_watcher_start() {
+  local settle=10
+  _parallel_watcher_stop
+
+  (
+    local -a last_hashes
+    local -a stable_since
+    local now=$(date +%s)
+    for ((wi=1; wi<=${#ai_panes[@]}; wi++)); do
+      last_hashes[$wi]=""
+      stable_since[$wi]=$now
+    done
+
+    while true; do
+      sleep 2
+      local all_stable=true
+      now=$(date +%s)
+
+      for ((wi=1; wi<=${#ai_panes[@]}; wi++)); do
+        local pout=$(tmux capture-pane -t "${ai_panes[$wi]}" -p -S -30 2>/dev/null | sed '/^[[:space:]]*$/d' | tail -n 30)
+        local cur_hash=""
+        [ -n "$pout" ] && cur_hash=$(printf '%s' "$pout" | shasum -a 256 | awk '{print $1}')
+
+        if [ -n "$cur_hash" ] && [[ "$cur_hash" != "${last_hashes[$wi]}" ]]; then
+          last_hashes[$wi]="$cur_hash"
+          stable_since[$wi]=$now
+        fi
+
+        local elapsed=$(( now - ${stable_since[$wi]} ))
+        if (( elapsed < settle )); then
+          all_stable=false
+        fi
+      done
+
+      if $all_stable; then
+        printf "\n  ${grn}${bld}✔ 모든 AI 작업 완료${rst}\n"
+        printf "  ${ylw}${bld}  /pick N${rst}     ${dm}— N번 AI 결과 직접 채택${rst}\n"
+        printf "  ${ylw}${bld}  /compare N${rst}  ${dm}— N번 AI가 비교 후 최적 선택${rst}\n"
+        printf "  ${ylw}${bld}  /merge N${rst}    ${dm}— N번 AI가 모든 결과 종합${rst}\n"
+        printf '\a'  # Terminal Bell
+        break
+      fi
+    done
+  ) &
+  _parallel_watcher_pid=$!
+}
+
+# ════════════════════════════════════════
 # AUTO-NEXT: auto-start in sequential mode
 # ════════════════════════════════════════
 if [[ "$mode" == "sequential" ]]; then
@@ -1530,6 +1851,12 @@ while true; do
   fi
 
   case "$input" in
+    /clear)
+      _do_clear
+      ;;
+    /dash|/dashboard)
+      _do_dashboard
+      ;;
     /quit)
       _auto_stop
       printf "  ${red}세션을 종료합니다...${rst}\n"
@@ -1617,7 +1944,18 @@ while true; do
     /next|/next\ *)
       local next_prompt="${input#/next}"
       next_prompt="${next_prompt# }"
-      _do_next $next_prompt
+      # 숫자만 입력된 경우 N번 반복 실행
+      if [[ "$next_prompt" =~ ^[0-9]+$ ]] && [ "$next_prompt" -gt 1 ]; then
+        local repeat_count="$next_prompt"
+        printf "  ${cyn}${bld}🔁 /next ${repeat_count}회 반복 실행${rst}\n"
+        for ((ri=1; ri<=repeat_count; ri++)); do
+          printf "  ${dm}── 반복 ${ri}/${repeat_count} ──${rst}\n"
+          _do_next
+          [ "$ri" -lt "$repeat_count" ] && sleep 1
+        done
+      else
+        _do_next $next_prompt
+      fi
       ;;
     /skip)
       _do_skip
@@ -1639,14 +1977,18 @@ while true; do
       local pick_num="${input#/pick }"
       _do_pick "$pick_num"
       ;;
-    /compare)
-      _do_compare
+    /compare|/compare\ *)
+      local compare_arg="${input#/compare}"
+      compare_arg="${compare_arg# }"
+      _do_compare "$compare_arg"
       ;;
     /board)
       _do_board
       ;;
-    /merge)
-      _do_merge
+    /merge|/merge\ *)
+      local merge_arg="${input#/merge}"
+      merge_arg="${merge_arg# }"
+      _do_merge "$merge_arg"
       ;;
     /prompt\ *)
       local new_prompt="${input#/prompt }"
@@ -1704,6 +2046,7 @@ while true; do
       printf "  ${ylw}/ctx${rst}    컨텍스트 확인  ${ylw}/prompt X${rst} 프롬프트 변경\n"
       printf "  ${ylw}/auto${rst}   context 변경 감지→자동 /next  ${ylw}/auto stop${rst} 중지\n"
       printf "  ${ylw}/focus N${rst} 포커스  ${ylw}/mode X${rst} 모드변경 ${dm}(p/s/c)${rst}\n"
+      printf "  ${ylw}/clear${rst}  화면 지우기  ${ylw}/dash${rst}  대시보드\n"
       printf "  ${ylw}/quit${rst}   종료\n"
       
       _mode_help_text
@@ -1727,12 +2070,18 @@ while true; do
         else
           printf "  ${red}현재 활성 AI가 없습니다${rst}\n"
         fi
+      elif [[ "$_mode_input_routing" == "priority" ]]; then
+        # collaborative priority: 1순위만 먼저, 나머지 캐스케이드
+        _priority_watcher_stop
+        _priority_watcher_start "$input"
       else
-        # parallel & collaborative: broadcast to all
+        # parallel: broadcast to all
+        _parallel_watcher_stop
         for ((pi=1; pi<=${#ai_panes[@]}; pi++)); do
           _send_to_pane "${ai_panes[$pi]}" "${_cmd_tools[$pi]}" "$input"
         done
         printf "  ${dm}→ ${#ai_panes[@]}개 AI에 전송됨${rst}\n"
+        _parallel_watcher_start
       fi
       ;;
   esac
@@ -1963,6 +2312,17 @@ while tmux has-session -t "$session" 2>/dev/null; do
     [ -z "$cur_round" ] && cur_round=1
     [ -z "$cur_turn" ] && cur_turn=0
     mode_info="${sep}#[fg=colour141,bold]R${cur_round}:T${cur_turn}#[default]"
+  elif [[ "$mode" == "collaborative" ]]; then
+    # show roles in status bar
+    role_parts=""
+    for ((k=1; k<=${#tool_names[@]}; k++)); do
+      rfile="$tmpdir/role_${tool_names[$k]}.txt"
+      if [ -f "$rfile" ]; then
+        rname=$(cat "$rfile" 2>/dev/null)
+        [ -n "$rname" ] && role_parts+="${tool_icons[$k]}${rname} "
+      fi
+    done
+    [ -n "$role_parts" ] && mode_info="${sep}#[fg=colour141]${role_parts}#[default]"
   elif [[ "$mode" == "parallel" ]]; then
     # check if winner picked
     if [ -f "$tmpdir/context_winner.md" ]; then
