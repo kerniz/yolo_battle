@@ -187,7 +187,7 @@ _mode_cmd_info() {
       fi
     done
   done
-  printf "\n  ${ylw}${bld}▶ 커맨드 → P1 먼저 → 안정화 후 P2 → P3 순 캐스케이드${rst}\n"
+  printf "\n  ${ylw}${bld}▶ 커맨드 → P1→P2→P3 캐스케이드 → P1 최종 종합 검토 및 요약${rst}\n"
 }
 
 # ── banner extra info ──
@@ -240,6 +240,6 @@ _mode_help_text() {
   printf "  ${ylw}/roles${rst}     현재 역할 확인\n"
   printf "\n  ${cyn}${bld}우선순위 캐스케이드:${rst}\n"
   printf "  ${dm}P1(구현) → P2(검토) → P3(테스트/문서) 순서로 활성화${rst}\n"
-  printf "  ${dm}커맨드 입력 → P1에만 전송 → P1 안정화(10s) 후 P2에 전송${rst}\n"
-  printf "  ${dm}P2 안정화 후 P3에 전송. 원래 커맨드+검토지시 함께 전달${rst}\n"
+  printf "  ${dm}P1 안정화(10s) 후 P2에 전송 → P2 안정화 후 P3에 전송${rst}\n"
+  printf "  ${dm}P3 안정화 후 P1이 다시 활성화되어 전체 작업 내용을 요약${rst}\n"
 }
