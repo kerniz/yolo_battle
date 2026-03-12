@@ -665,9 +665,8 @@ _do_merge() {
     for ((mi=1; mi<=${#_cmd_tools[@]}; mi++)); do
       local tname="${_cmd_tools[$mi]}"
       git worktree remove "$tmpdir/work_${tname}" 2>/dev/null
-      git branch -D "battle-coop-${tname}" 2>/dev/null
     done
-    printf "  ${dm}워크트리 정리 완료${rst}\n"
+    printf "  ${dm}워크트리 정리 완료 (브랜치는 참조용으로 유지)${rst}\n"
   else
     printf "  ${ylw}충돌 브랜치는 수동 머지 후 정리하세요${rst}\n"
   fi
@@ -757,13 +756,12 @@ _do_auto_merge_push() {
     return
   fi
 
-  # 워크트리 정리
+  # 워크트리 정리 (브랜치는 참조용으로 유지)
   for ((mi=1; mi<=${#_cmd_tools[@]}; mi++)); do
     local tname="${_cmd_tools[$mi]}"
     git worktree remove "$tmpdir/work_${tname}" 2>/dev/null
-    git branch -D "battle-coop-${tname}" 2>/dev/null
   done
-  printf "  ${dm}워크트리/브랜치 정리 완료${rst}\n"
+  printf "  ${dm}워크트리 정리 완료 (브랜치는 참조용으로 유지)${rst}\n"
 
   # 푸시 (n/N 이외는 모두 푸시)
   if [[ "$_merge_choice" != "n" && "$_merge_choice" != "N" ]]; then
