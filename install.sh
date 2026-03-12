@@ -82,6 +82,8 @@ cp "$SCRIPT_DIR/yolo.zsh" "$YOLO_DIR/yolo.zsh"
 cp "$SCRIPT_DIR/battle.zsh" "$YOLO_DIR/battle.zsh"
 mkdir -p "$YOLO_DIR/modes"
 cp "$SCRIPT_DIR/modes/"*.zsh "$YOLO_DIR/modes/" 2>/dev/null
+mkdir -p "$YOLO_DIR/lib"
+cp "$SCRIPT_DIR/lib/"*.zsh "$YOLO_DIR/lib/" 2>/dev/null
 chmod +x "$YOLO_DIR/yolo.zsh" "$YOLO_DIR/battle.zsh"
 
 # cleanup temp clone

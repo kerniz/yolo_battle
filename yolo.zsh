@@ -6,6 +6,7 @@
 YOLO_DIR="${YOLO_DIR:-$HOME/.yolo}"
 
 yolo() {
+  setopt local_options no_xtrace no_verbose
   local tool="$1"
   local -a _yolo_opts
   local -a _yolo_icons
