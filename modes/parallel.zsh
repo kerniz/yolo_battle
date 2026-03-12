@@ -62,9 +62,9 @@ EOF
 
 # ── help panel commands ──
 _mode_help_commands() {
-  echo 'printf "  ${prp}${bld}║${rst}  ${cyn}${bld}⚡ 동시 모드${rst}                                          ${prp}${bld}║${rst}\n"'
-  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}${bld}/pick N${rst}  직접 채택${cyn}★${rst}    ${ylw}/compare${rst}  결과 비교      ${prp}${bld}║${rst}\n"'
-  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/compare N${rst} AI선택     ${ylw}/merge N${rst}  AI가 종합     ${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${cyn}${bld}⚡ 동시 모드${rst}                                    ${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}${bld}/pick N${rst}  직접 채택${cyn}★${rst}    ${ylw}/compare${rst}  결과 비교    ${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/compare N${rst} AI선택     ${ylw}/merge N${rst}  AI가 종합   ${prp}${bld}║${rst}\n"'
 }
 
 # ── help panel info section ──

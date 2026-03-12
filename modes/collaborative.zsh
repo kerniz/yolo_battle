@@ -137,21 +137,25 @@ EOF
 
 # ── help panel commands ──
 _mode_help_commands() {
-  echo 'printf "  ${prp}${bld}║${rst}  ${cyn}${bld}🤝 협동 모드${rst}                                          ${prp}${bld}║${rst}\n"'
-  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}${bld}/merge${rst}   브랜치 머지${cyn}★${rst}  ${ylw}/board${rst}    공유보드 확인  ${prp}${bld}║${rst}\n"'
-  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/swap N M${rst} 역할 교체     ${ylw}/role N X${rst} 역할 변경    ${prp}${bld}║${rst}\n"'
-  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/roles${rst}    역할 확인     ${dm}P1→P2→P3 캐스케이드${rst}    ${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${cyn}${bld}🤝 협동 모드${rst}                                    ${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}${bld}/merge${rst}   브랜치 머지${cyn}★${rst}  ${ylw}/board${rst}    공유보드 확인${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/swap N M${rst} 역할 교체     ${ylw}/role N X${rst} 역할 변경  ${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/roles${rst}    역할 확인     ${dm}P1→P2→P3 캐스케이드${rst}  ${prp}${bld}║${rst}\n"'
 }
 
 # ── help panel info section ──
 _mode_help_info() {
   local cnt="$1"
   shift
-  local -a tools=("$@")
+  # args layout: tools(cnt) icons(cnt) seq_order(cnt) roles(cnt)
+  local -a tools icons roles
+  tools=("${(@)@[1,cnt]}")
   shift $cnt
-  local -a icons=("$@")
+  icons=("${(@)@[1,cnt]}")
   shift $cnt
-  local -a roles=("$@")
+  # skip seq_order (cnt elements)
+  shift $cnt
+  roles=("$@")
   echo 'printf "\n  ${grn}${bld}📋 역할 배정:${rst}\n"'
   for ((j=1; j<=$cnt; j++)); do
     echo "printf '   ${icons[$j]} ${tools[$j]}: ${roles[$j]:-Dev}\n'"
