@@ -342,12 +342,16 @@ _yolo_battle() {
 
     # per-AI role assignment
     _roles=()
+    local _ri=0
+    local _rkey
+    local cursor_up=$'\033[A'
+    local cursor_down=$'\033[B'
+    local bg_sel=$'\033[48;5;236m'
+    local _rh_lines=5
+    local _rf_lines=1
+    local _total_role_lines
     for ((_ai_idx=1; _ai_idx<=$cnt; _ai_idx++)); do
-      local _ri=0
-      local _rkey
-      local cursor_up=$'\033[A'
-      local cursor_down=$'\033[B'
-      local bg_sel=$'\033[48;5;236m'
+      _ri=0
 
       # set default cursor to a sensible position
       case $_ai_idx in
@@ -360,8 +364,8 @@ _yolo_battle() {
       printf "\033[?25l"
       trap 'printf "\033[?25h"' INT
 
-      local _rh_lines=5  # header lines
-      local _rf_lines=1  # footer line
+      _rh_lines=5  # header lines
+      _rf_lines=1  # footer line
 
       printf "\n"
       printf "  ${purple}${bold}╔══════════════════════════════════════╗${reset}\n"
@@ -414,7 +418,7 @@ _yolo_battle() {
       _roles+=("${_avail_roles[$((_ri+1))]}")
 
       # clear role selection UI
-      local _total_role_lines=$((_rh_lines + _avail_cnt + _rf_lines))
+      _total_role_lines=$((_rh_lines + _avail_cnt + _rf_lines))
       printf "\033[${_total_role_lines}A\033[J"
 
       printf "\033[?25h"
@@ -505,19 +509,19 @@ _yolo_battle() {
   # ── generate tool scripts ──
   local -a _battle_scripts
   local session="yolo-battle"
+  local tname ticon script toolworkdir _wt_ok _old_wt
 
   for ((j=1; j<=$cnt; j++)); do
-    local tname="${_yolo_opts[$j]}"
-    local ticon="${_yolo_icons[$j]}"
-    local script="$tmpdir/run_${tname}.sh"
-    local toolworkdir="$tmpdir/work_${tname}"
+    tname="${_yolo_opts[$j]}"
+    ticon="${_yolo_icons[$j]}"
+    script="$tmpdir/run_${tname}.sh"
+    toolworkdir="$tmpdir/work_${tname}"
 
     # co-op mode: create git worktree for file isolation (no simultaneous writes)
     if [[ "$mode" == "collaborative" ]]; then
-      local _wt_ok=false
+      _wt_ok=false
       if $_coop_use_worktree; then
         # Cleanup existing worktree/branch from previous sessions
-        local _old_wt
         _old_wt=$(git -C "$workdir" worktree list --porcelain 2>/dev/null | grep -B1 "branch.*battle-coop-${tname}$" | head -1 | sed 's/^worktree //')
         if [ -n "$_old_wt" ] && [ "$_old_wt" != "$toolworkdir" ]; then
           git -C "$workdir" worktree remove --force "$_old_wt" 2>/dev/null
@@ -747,7 +751,7 @@ DONE_END
     echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/help${rst}    도움말       ${ylw}/quit${rst}     세션 종료    ${prp}${bld}║${rst}\n"'
 
     # mode-specific help commands (from mode skill)
-    echo 'printf "  ${prp}${bld}╠══════════════════════════════════════════════════════════╣${rst}\n"'
+    echo 'printf "  ${prp}${bld}╠═══════════════════════════════════════════════════╣${rst}\n"'
     _mode_help_commands
 
     echo 'printf "  ${prp}${bld}╠═══════════════════════════════════════════════════╣${rst}\n"'
