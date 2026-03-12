@@ -157,10 +157,10 @@ EOF
 
 # ── help panel commands ──
 _mode_help_commands() {
-  echo 'printf "  ${prp}${bld}║${rst}  ${cyn}${bld}➡️  순차 모드${rst}                                          ${prp}${bld}║${rst}\n"'
-  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}${bld}/next${rst}    다음 AI${cyn}★${rst}      ${ylw}/skip${rst}     건너뛰기      ${prp}${bld}║${rst}\n"'
-  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/auto${rst}    자동 전환     ${ylw}/order N${rst} 순서 변경      ${prp}${bld}║${rst}\n"'
-  echo 'printf "  ${prp}${bld}║${rst}  ${dm}/next 지시  /next 3  /auto stop  1→2→3→1...${rst}${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${cyn}${bld}➡️  순차 모드${rst}                                    ${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}${bld}/next${rst}    다음 AI${cyn}★${rst}    ${ylw}/skip${rst}     건너뛰기    ${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/auto${rst}    자동 전환   ${ylw}/order N${rst} 순서 변경    ${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${dm}/next 지시 /next 3 /auto stop 1→2→3${rst}  ${prp}${bld}║${rst}\n"'
 }
 
 # ── help panel info section ──
