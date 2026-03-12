@@ -245,5 +245,5 @@ _mode_help_text() {
   printf "\n  ${cyn}${bld}우선순위 캐스케이드:${rst}\n"
   printf "  ${dm}P1(구현) → P2(검토) → P3(테스트/문서) 순서로 활성화${rst}\n"
   printf "  ${dm}P1 안정화(10s) 후 P2에 전송 → P2 안정화 후 P3에 전송${rst}\n"
-  printf "  ${dm}P3 안정화 후 P1이 다시 활성화되어 전체 작업 내용을 요약${rst}\n"
+  printf "  ${dm}P3 완료 → P1 종합 검토(흡수/버림) → 머지/커밋/푸시${rst}\n"
 }

@@ -674,6 +674,122 @@ _do_merge() {
   printf "\n"
 }
 
+# ════════════════════════════════════════
+# _do_auto_merge_push - P1 종합 검토 후 자동 머지/커밋/푸시
+# 사용자 확인을 거친 후 실행
+# ════════════════════════════════════════
+_do_auto_merge_push() {
+  rm -f "$tmpdir/needs_merge.txt"
+
+  printf "\n  ${cyn}${bld}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${rst}\n"
+  printf "  ${cyn}${bld}🔀 종합 검토 완료 — 브랜치 머지/푸시${rst}\n"
+  printf "  ${cyn}${bld}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${rst}\n\n"
+
+  # 각 브랜치 변경사항 미리보기
+  cd "$workdir"
+  local has_changes=false
+  for ((mi=1; mi<=${#_cmd_tools[@]}; mi++)); do
+    local branch="battle-coop-${_cmd_tools[$mi]}"
+    if git rev-parse --verify "$branch" >/dev/null 2>&1; then
+      local branch_diff=$(git diff HEAD..."$branch" --stat 2>/dev/null)
+      if [ -n "$branch_diff" ]; then
+        has_changes=true
+        printf "  ${_cmd_icons[$mi]} ${ylw}${bld}${_cmd_tools[$mi]}${rst} ${dm}(${branch})${rst}\n"
+        echo "$branch_diff" | while IFS= read -r dl; do
+          printf "    ${dm}%s${rst}\n" "$dl"
+        done
+        printf "\n"
+      else
+        printf "  ${_cmd_icons[$mi]} ${dm}${_cmd_tools[$mi]}: (변경 없음)${rst}\n"
+      fi
+    fi
+  done
+
+  if ! $has_changes; then
+    printf "\n  ${dm}머지할 변경사항이 없습니다.${rst}\n\n"
+    return
+  fi
+
+  # 사용자 확인
+  printf "  ${ylw}${bld}머지 후 푸시하시겠습니까?${rst}\n"
+  printf "  ${dm}  y) 머지 + 커밋 + 푸시${rst}\n"
+  printf "  ${dm}  m) 머지만 (푸시 안 함)${rst}\n"
+  printf "  ${dm}  n) 나중에 (/merge로 수동)${rst}\n"
+  printf "  ${ylw}선택 [y/m/n]:${rst} "
+  local _merge_choice
+  read -r _merge_choice
+
+  case "$_merge_choice" in
+    n|N)
+      printf "  ${dm}건너뜀. /merge 로 나중에 실행 가능합니다.${rst}\n\n"
+      return
+      ;;
+  esac
+
+  # 머지 실행
+  local merged=0 conflicts=0
+  local -a conflict_branches=()
+  printf "\n  ${cyn}${bld}🔀 머지 시작${rst}\n"
+  for ((mi=1; mi<=${#_cmd_tools[@]}; mi++)); do
+    local branch="battle-coop-${_cmd_tools[$mi]}"
+    if git rev-parse --verify "$branch" >/dev/null 2>&1; then
+      local branch_diff=$(git diff HEAD..."$branch" --stat 2>/dev/null)
+      if [ -z "$branch_diff" ]; then
+        continue
+      fi
+      printf "  ${cyn}${_cmd_icons[$mi]} ${_cmd_tools[$mi]} 머지 중...${rst}"
+      if git merge --no-edit "$branch" 2>/dev/null; then
+        printf " ${grn}✔${rst}\n"
+        merged=$((merged + 1))
+      else
+        printf " ${red}✖ 충돌!${rst}\n"
+        git merge --abort 2>/dev/null
+        conflicts=$((conflicts + 1))
+        conflict_branches+=("$branch")
+      fi
+    fi
+  done
+
+  printf "\n  ${grn}${bld}머지: ${merged}개 성공${rst}"
+  [ $conflicts -gt 0 ] && printf "  ${red}${bld}충돌: ${conflicts}개${rst}"
+  printf "\n"
+
+  if [ $conflicts -gt 0 ]; then
+    printf "\n  ${ylw}${bld}⚠ 충돌 브랜치:${rst}\n"
+    for cb in "${conflict_branches[@]}"; do
+      printf "    ${red}${cb}${rst}\n"
+    done
+    printf "\n  ${ylw}충돌 해결 후 다시 /merge 를 실행하세요.${rst}\n"
+    printf "  ${dm}  git merge ${conflict_branches[1]} → 충돌 해결 → git add . → git commit${rst}\n"
+    printf "  ${dm}  그 다음 /merge 로 나머지 처리${rst}\n\n"
+    return
+  fi
+
+  # 워크트리 정리
+  for ((mi=1; mi<=${#_cmd_tools[@]}; mi++)); do
+    local tname="${_cmd_tools[$mi]}"
+    git worktree remove "$tmpdir/work_${tname}" 2>/dev/null
+    git branch -D "battle-coop-${tname}" 2>/dev/null
+  done
+  printf "  ${dm}워크트리/브랜치 정리 완료${rst}\n"
+
+  # 푸시
+  if [[ "$_merge_choice" == "y" || "$_merge_choice" == "Y" ]]; then
+    printf "\n  ${cyn}${bld}📤 푸시 중...${rst}"
+    local _current_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+    if git push origin "$_current_branch" 2>/dev/null; then
+      printf " ${grn}✔${rst}\n"
+      printf "  ${grn}${bld}✔ 머지 + 푸시 완료!${rst}\n\n"
+    else
+      printf " ${red}✖${rst}\n"
+      printf "  ${red}푸시 실패. 수동으로 git push 하세요.${rst}\n\n"
+    fi
+  else
+    printf "\n  ${grn}${bld}✔ 머지 완료! (푸시는 수동으로)${rst}\n"
+    printf "  ${dm}  git push origin $(git rev-parse --abbrev-ref HEAD 2>/dev/null)${rst}\n\n"
+  fi
+}
+
 # sequential mode: auto-start first AI
 if [[ "$mode" == "sequential" ]]; then
   echo "1" > "$tmpdir/seq_turn.txt"
@@ -1002,6 +1118,8 @@ _priority_watcher_start() {
                 fi
               done
               printf "\n  ${grn}${bld}✔ 종합 검토 완료${rst}\n"
+              # 머지/푸시 프롬프트 플래그 등록
+              echo "ready" > "$tmpdir/needs_merge.txt"
             fi
           fi
 
@@ -1107,6 +1225,11 @@ fi
 # INPUT LOOP
 # ════════════════════════════════════════
 while true; do
+  # P1 종합 검토 완료 후 자동 머지/푸시 프롬프트
+  if [[ "$mode" == "collaborative" ]] && [ -f "$tmpdir/needs_merge.txt" ]; then
+    _do_auto_merge_push
+  fi
+
   input=""
   # tmux pane 실제 너비로 COLUMNS 갱신 (줄바꿈 정확도 향상)
   local _pw=$(tmux display-message -p '#{pane_width}' 2>/dev/null)
