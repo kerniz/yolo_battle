@@ -157,22 +157,10 @@ EOF
 
 # ── help panel commands ──
 _mode_help_commands() {
-  echo 'printf "  ${prp}${bld}╠════════════════════════════════╣${rst}\n"'
-  echo 'printf "  ${prp}${bld}║${rst}  ${cyn}순차 모드 명령어${rst}             ${prp}${bld}║${rst}\n"'
-  echo 'printf "  ${prp}${bld}╠════════════════════════════════╣${rst}\n"'
-  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}${bld}/next${rst}       다음 AI 전환${cyn}★${rst} ${prp}${bld}║${rst}\n"'
-  echo 'printf "  ${prp}${bld}║${rst}  ${dm}  /next${rst}      ${dm}다음 턴으로 전환${rst}${prp}${bld}║${rst}\n"'
-  echo 'printf "  ${prp}${bld}║${rst}  ${dm}  /next 작업내용${rst} ${dm}+지시 전달${rst}${prp}${bld}║${rst}\n"'
-  echo 'printf "  ${prp}${bld}║${rst}  ${dm}  /next 3${rst}    ${dm}3턴 연속 넘기기${rst}${prp}${bld}║${rst}\n"'
-  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/skip${rst}       건너뛰기+활성화 ${prp}${bld}║${rst}\n"'
-  echo 'printf "  ${prp}${bld}║${rst}  ${dm}  현재 AI 결과 무시, 다음 전환${rst}${prp}${bld}║${rst}\n"'
-  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/auto${rst} ${dm}[N]${rst}   자동 전환 시작  ${prp}${bld}║${rst}\n"'
-  echo 'printf "  ${prp}${bld}║${rst}  ${dm}  /auto${rst}      ${dm}10초 안정화 후 전환${rst}${prp}${bld}║${rst}\n"'
-  echo 'printf "  ${prp}${bld}║${rst}  ${dm}  /auto 5${rst}    ${dm}5초 안정화 후 전환${rst}${prp}${bld}║${rst}\n"'
-  echo 'printf "  ${prp}${bld}║${rst}  ${dm}  /auto stop${rst} ${dm}자동 전환 중지${rst}  ${prp}${bld}║${rst}\n"'
-  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/order N..${rst}  순서 변경       ${prp}${bld}║${rst}\n"'
-  echo 'printf "  ${prp}${bld}║${rst}  ${dm}  /order 2 1 3${rst} ${dm}순서 재배치${rst} ${prp}${bld}║${rst}\n"'
-  echo 'printf "  ${prp}${bld}║${rst}  ${dm}  1→2→3→1→... 무한순환${rst}   ${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${cyn}${bld}➡️  순차 모드${rst}                                          ${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}${bld}/next${rst}    다음 AI${cyn}★${rst}      ${ylw}/skip${rst}     건너뛰기      ${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${ylw}/auto${rst}    자동 전환     ${ylw}/order N${rst} 순서 변경      ${prp}${bld}║${rst}\n"'
+  echo 'printf "  ${prp}${bld}║${rst}  ${dm}/next 지시  /next 3  /auto stop  1→2→3→1...${rst}${prp}${bld}║${rst}\n"'
 }
 
 # ── help panel info section ──
@@ -199,25 +187,6 @@ _mode_cmd_header() {
   printf "  ${prp}${bld}║${rst}  ${dm}1개 컨텍스트 릴레이 /next 순환${rst}     ${prp}${bld}║${rst}\n"
 }
 
-# ── cmd center mode commands ──
-_mode_cmd_commands() {
-  printf "  ${prp}${bld}╠══════════════════════════════════════╣${rst}\n"
-  printf "  ${prp}${bld}║${rst}  ${cyn}순차 모드 명령어:${rst}                    ${prp}${bld}║${rst}\n"
-  printf "  ${prp}${bld}╠══════════════════════════════════════╣${rst}\n"
-  printf "  ${prp}${bld}║${rst}   ${ylw}${bld}/next${rst}         다음 AI 전환 ${cyn}★${rst}    ${prp}${bld}║${rst}\n"
-  printf "  ${prp}${bld}║${rst}   ${dm}  /next${rst}         ${dm}다음 턴으로 전환${rst}  ${prp}${bld}║${rst}\n"
-  printf "  ${prp}${bld}║${rst}   ${dm}  /next 작업지시${rst}  ${dm}+메시지 전달${rst}   ${prp}${bld}║${rst}\n"
-  printf "  ${prp}${bld}║${rst}   ${dm}  /next 3${rst}       ${dm}3턴 연속 넘기기${rst} ${prp}${bld}║${rst}\n"
-  printf "  ${prp}${bld}║${rst}   ${ylw}/skip${rst}         건너뛰기+활성화     ${prp}${bld}║${rst}\n"
-  printf "  ${prp}${bld}║${rst}   ${dm}  현재 AI 결과 무시, 다음으로 전환${rst}${prp}${bld}║${rst}\n"
-  printf "  ${prp}${bld}║${rst}   ${ylw}/auto${rst} ${dm}[N]${rst}      자동 전환         ${prp}${bld}║${rst}\n"
-  printf "  ${prp}${bld}║${rst}   ${dm}  /auto${rst}         ${dm}10초 안정화→전환${rst} ${prp}${bld}║${rst}\n"
-  printf "  ${prp}${bld}║${rst}   ${dm}  /auto 5${rst}       ${dm}5초 안정화→전환${rst}  ${prp}${bld}║${rst}\n"
-  printf "  ${prp}${bld}║${rst}   ${dm}  /auto stop${rst}    ${dm}자동 전환 중지${rst}  ${prp}${bld}║${rst}\n"
-  printf "  ${prp}${bld}║${rst}   ${ylw}/order N..${rst}    순서 변경            ${prp}${bld}║${rst}\n"
-  printf "  ${prp}${bld}║${rst}   ${dm}  /order 2 1 3${rst}  ${dm}순서 재배치${rst}    ${prp}${bld}║${rst}\n"
-  printf "  ${prp}${bld}║${rst}   ${dm}  1→2→3→1→... 무한 라운드로빈${rst}  ${prp}${bld}║${rst}\n"
-}
 
 # ── cmd center mode info ──
 _mode_cmd_info() {
