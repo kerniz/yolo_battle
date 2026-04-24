@@ -18,8 +18,8 @@ Multi-agent AI battle system for your terminal. Run Claude, Gemini, and Codex si
 
 ## Requirements
 
-- **zsh** (default on macOS)
-- **tmux** (`brew install tmux`)
+- **zsh** (default on macOS, auto-installed by `install.sh` on Ubuntu/Debian)
+- **tmux** (auto-installed by `install.sh`)
 - At least **2** of the following AI CLIs:
   - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) — `npm install -g @anthropic-ai/claude-code`
   - [Gemini CLI](https://github.com/google-gemini/gemini-cli) — `npm install -g @google/gemini-cli`
@@ -38,9 +38,27 @@ Or manually:
 
 ```bash
 mkdir -p ~/.yolo
-cp yolo.zsh battle.zsh ~/.yolo/
+cp yolo.zsh yolo.sh battle.zsh ~/.yolo/
+cp modes/*.zsh lib/*.zsh ~/.yolo/
+chmod +x ~/.yolo/yolo.sh ~/.yolo/battle.zsh
 echo 'source "${HOME}/.yolo/yolo.zsh"' >> ~/.zshrc
 source ~/.zshrc
+```
+
+### Using yolo.sh (bash wrapper for zsh)
+
+`yolo.sh` is a thin bash/zsh shim that wraps `yolo.zsh`. It works on Linux bash environments too:
+
+```bash
+source ~/.bashrc
+yolo              # works in bash (calls zsh internally)
+yolo claude
+yolo battle "prompt"
+```
+
+Or add to your `~/.bashrc` manually:
+```bash
+# "${HOME}/.yolo/yolo.zsh" "$@"; }
 ```
 
 ## Usage
@@ -153,7 +171,7 @@ The bottom status bar shows real-time status for each AI:
 
 ```bash
 rm -rf ~/.yolo
-# Remove the source line from ~/.zshrc
+# Remove the source line from ~/.zshrc or ~/.bashrc
 ```
 
 ## CLI Reference

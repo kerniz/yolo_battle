@@ -7,4 +7,4 @@ test:
 
 lint:
 	zsh -n yolo.zsh battle.zsh lib/*.zsh modes/*.zsh
-	bash -n install.sh
+	bash -n install.sh yolo.sh

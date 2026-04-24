@@ -15,8 +15,7 @@ DIM='\033[2m'
 BOLD='\033[1m'
 RESET='\033[0m'
 
-printf "\n"
-printf "  ${PURPLE}${BOLD}╔══════════════════════════════════════╗${RESET}\n"
+printf "\n  ${PURPLE}${BOLD}╔══════════════════════════════════════╗${RESET}\n"
 printf "  ${PURPLE}${BOLD}║${RESET}  ${YELLOW}${BOLD}⚡ Y O L O   B A T T L E${RESET}            ${PURPLE}${BOLD}║${RESET}\n"
 printf "  ${PURPLE}${BOLD}║${RESET}  ${DIM}Multi-agent AI battle system${RESET}        ${PURPLE}${BOLD}║${RESET}\n"
 printf "  ${PURPLE}${BOLD}╚══════════════════════════════════════╝${RESET}\n"
@@ -24,15 +23,35 @@ printf "\n"
 
 # check zsh
 if ! command -v zsh >/dev/null 2>&1; then
-  printf "  ${RED}${BOLD}✖  zsh is required${RESET}\n"
-  exit 1
+  printf "  ${YELLOW}${BOLD}⚠  zsh not found, installing...${RESET}\n"
+  if command -v apt-get >/dev/null 2>&1; then
+    sudo apt-get update -qq >/dev/null 2>&1 && sudo apt-get install -y -qq zsh >/dev/null 2>&1
+  elif command -v brew >/dev/null 2>&1; then
+    brew install zsh >/dev/null 2>&1
+  fi
+  if command -v zsh >/dev/null 2>&1; then
+    printf "  ${GREEN}${BOLD}✔  zsh installed${RESET}\n"
+  else
+    printf "  ${DIM}Please install zsh manually${RESET}\n"
+    exit 1
+  fi
 fi
 
 # check tmux
 if ! command -v tmux >/dev/null 2>&1; then
-  printf "  ${YELLOW}${BOLD}⚠  tmux not found${RESET} ${DIM}(required for battle mode)${RESET}\n"
-  printf "  ${DIM}  brew install tmux  ${RESET}${DIM}# macOS${RESET}\n"
-  printf "  ${DIM}  apt install tmux   ${RESET}${DIM}# Ubuntu/Debian${RESET}\n\n"
+  printf "  ${YELLOW}${BOLD}⚠  tmux not found, installing...${RESET}\n"
+  if command -v apt-get >/dev/null 2>&1; then
+    sudo apt-get install -y -qq tmux >/dev/null 2>&1
+  elif command -v brew >/dev/null 2>&1; then
+    brew install tmux >/dev/null 2>&1
+  fi
+  if command -v tmux >/dev/null 2>&1; then
+    printf "  ${GREEN}${BOLD}✔  tmux installed${RESET}\n"
+  else
+    printf "  ${DIM}Please install tmux manually${RESET}\n"
+    printf "  ${DIM}  apt install tmux   ${RESET}${DIM}# Ubuntu/Debian${RESET}\n"
+    printf "  ${DIM}  brew install tmux  ${RESET}${DIM}# macOS${RESET}\n\n"
+  fi
 fi
 
 # check AI CLIs
@@ -79,13 +98,14 @@ printf "  ${DIM}Installing to ${YOLO_DIR}...${RESET}\n"
 mkdir -p "$YOLO_DIR"
 chmod 700 "$YOLO_DIR"
 
+cp "$SCRIPT_DIR/yolo.sh" "$YOLO_DIR/yolo.sh"
 cp "$SCRIPT_DIR/yolo.zsh" "$YOLO_DIR/yolo.zsh"
 cp "$SCRIPT_DIR/battle.zsh" "$YOLO_DIR/battle.zsh"
 mkdir -p "$YOLO_DIR/modes"
 cp "$SCRIPT_DIR/modes/"*.zsh "$YOLO_DIR/modes/" 2>/dev/null
 mkdir -p "$YOLO_DIR/lib"
 cp "$SCRIPT_DIR/lib/"*.zsh "$YOLO_DIR/lib/" 2>/dev/null
-chmod +x "$YOLO_DIR/yolo.zsh" "$YOLO_DIR/battle.zsh"
+chmod +x "$YOLO_DIR/yolo.sh" "$YOLO_DIR/yolo.zsh" "$YOLO_DIR/battle.zsh"
 
 # cleanup temp clone
 if [ -n "$TMPCLONE" ]; then
@@ -106,11 +126,20 @@ else
   printf "  ${GREEN}${BOLD}✔${RESET} Added to ~/.zshrc\n"
 fi
 
+# add to bashrc if exists
+if [ -f "$HOME/.bashrc" ]; then
+  BASHRC="$HOME/.bashrc"
+  if ! grep -q "yolo() {" "$BASHRC" 2>/dev/null; then
+    printf "\n# yolo battle\nyolo() { zsh \"\${HOME}/.yolo/yolo.zsh\" \"\$@\"; }\nyolo_battle() { zsh \"\${HOME}/.yolo/battle.zsh\" \"\$@\"; }\n" >> "$BASHRC"
+    printf "  ${GREEN}${BOLD}✔${RESET} Added to ~/.bashrc\n"
+  fi
+fi
+
 printf "\n"
 printf "  ${GREEN}${BOLD}✔  Installation complete!${RESET}\n"
 printf "\n"
 printf "  ${YELLOW}${BOLD}Usage:${RESET}\n"
-printf "  ${DIM}  source ~/.zshrc          ${RESET}${DIM}# reload shell${RESET}\n"
+printf "  ${DIM}  source ~/.bashrc or ~/.zshrc  ${RESET}${DIM}# reload shell${RESET}\n"
 printf "  ${DIM}  yolo                     ${RESET}${DIM}# interactive tool picker${RESET}\n"
 printf "  ${DIM}  yolo claude              ${RESET}${DIM}# direct launch${RESET}\n"
 printf "  ${DIM}  yolo battle \"prompt\"      ${RESET}${DIM}# parallel battle${RESET}\n"
