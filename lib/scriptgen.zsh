@@ -91,6 +91,12 @@ printf '  \033[38;5;82m\033[1m  ║  🧠  C O D E X               ║\033[0m\n'
 printf '  \033[38;5;82m\033[1m  ╚═══════════════════════════════╝\033[0m\n\n'
 B
         ;;
+        opencode) cat << 'B'
+printf '\n  \033[38;5;141m\033[1m  ╔═══════════════════════════════╗\033[0m\n'
+printf '  \033[38;5;141m\033[1m  ║  🦾  O P E N C O D E         ║\033[0m\n'
+printf '  \033[38;5;141m\033[1m  ╚═══════════════════════════════╝\033[0m\n\n'
+B
+        ;;
       esac
 
       # inject role variable if mode has roles
@@ -133,15 +139,28 @@ B
       cat << 'RUN_TOOL'
 if [ -n "$prompt" ]; then
   case "$toolname" in
-    claude) claude --dangerously-skip-permissions "$prompt" ;;
-    gemini) gemini --yolo "$prompt" ;;
-    codex)  codex --sandbox danger-full-access --ask-for-approval never "$prompt" ;;
+    claude)   claude --dangerously-skip-permissions "$prompt" ;;
+    gemini)   gemini --yolo "$prompt" ;;
+    codex)    codex --sandbox danger-full-access --ask-for-approval never "$prompt" ;;
+    opencode)
+      # TUI는 종료 시그널이 없으므로 send-keys로 prompt 주입.
+      # /auto는 cmd_center에서 opencode 포함 시 자동 비활성화되므로 수동 /next로 진행.
+      ( sleep "${OPENCODE_PROMPT_DELAY:-4}"
+        if [ -n "$TMUX_PANE" ]; then
+          tmux send-keys -t "$TMUX_PANE" -l "$prompt" 2>/dev/null
+          sleep 0.5
+          tmux send-keys -t "$TMUX_PANE" Enter 2>/dev/null
+        fi
+      ) &
+      OPENCODE_DANGEROUSLY_SKIP_PERMISSIONS=true opencode
+      ;;
   esac
 else
   case "$toolname" in
-    claude) claude --dangerously-skip-permissions ;;
-    gemini) gemini --yolo ;;
-    codex)  codex --sandbox danger-full-access --ask-for-approval never ;;
+    claude)   claude --dangerously-skip-permissions ;;
+    gemini)   gemini --yolo ;;
+    codex)    codex --sandbox danger-full-access --ask-for-approval never ;;
+    opencode) OPENCODE_DANGEROUSLY_SKIP_PERMISSIONS=true opencode ;;
   esac
 fi
 RUN_TOOL

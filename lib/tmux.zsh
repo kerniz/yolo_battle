@@ -1,6 +1,16 @@
 #!/bin/zsh
 # lib/tmux.zsh — Tmux session creation, styling, and cleanup
 
+# ── Portable in-place sed (BSD vs GNU) ──
+_battle_sed_inplace() {
+  local pattern="$1" file="$2"
+  if [[ "$(uname -s)" == "Darwin" ]]; then
+    sed -i '' "$pattern" "$file"
+  else
+    sed -i "$pattern" "$file"
+  fi
+}
+
 # ── Create tmux session with pane layout ──
 # Sets: _ai_pane_ids, _cmd_pane_id
 _battle_setup_tmux() {
@@ -9,44 +19,34 @@ _battle_setup_tmux() {
 
   if [ $cnt -eq 2 ]; then
     # 2x2 grid layout
-    sed -i '' 's/has_help_pane=false/has_help_pane=true/' "$cmd_script"
+    _battle_sed_inplace 's/has_help_pane=false/has_help_pane=true/' "$cmd_script"
     tmux new-session -d -s "$session" "zsh ${_battle_scripts[1]}"
     _ai_pane_ids[1]=$(tmux display-message -t "${session}" -p '#{pane_id}')
-    tmux split-window -h -t "${_ai_pane_ids[1]}" -p 50 "zsh ${_battle_scripts[2]}"
-    _ai_pane_ids[2]=$(tmux display-message -t "${session}" -p '#{pane_id}')
-    tmux split-window -v -t "${_ai_pane_ids[1]}" -p 50 "zsh ${cmd_script}"
-    _cmd_pane_id=$(tmux display-message -t "${session}" -p '#{pane_id}')
-    tmux split-window -v -t "${_ai_pane_ids[2]}" -p 50 "zsh ${help_script}"
-    local _help_pane_id=$(tmux display-message -t "${session}" -p '#{pane_id}')
+    _ai_pane_ids[2]=$(tmux split-window -h -t "${_ai_pane_ids[1]}" -l 50% -P -F '#{pane_id}' "zsh ${_battle_scripts[2]}")
+    _cmd_pane_id=$(tmux split-window -v -t "${_ai_pane_ids[1]}" -l 50% -P -F '#{pane_id}' "zsh ${cmd_script}")
+    local _help_pane_id=$(tmux split-window -v -t "${_ai_pane_ids[2]}" -l 50% -P -F '#{pane_id}' "zsh ${help_script}")
     echo "${_ai_pane_ids[1]} ${_ai_pane_ids[2]}" > "$tmpdir/ai_panes.txt"
     tmux select-pane -t "${_ai_pane_ids[1]}" -T "${_yolo_icons[1]} ${(U)_yolo_opts[1]}"
     tmux select-pane -t "${_ai_pane_ids[2]}" -T "${_yolo_icons[2]} ${(U)_yolo_opts[2]}"
     tmux select-pane -t "${_cmd_pane_id}" -T "⌨️  COMMAND"
     tmux select-pane -t "${_help_pane_id}" -T "📋 GUIDE"
-  elif [ $cnt -ge 3 ]; then
+  elif [ $cnt -eq 3 ]; then
     if [[ "$_layout_choice" == "top3" ]]; then
-      sed -i '' 's/has_help_pane=false/has_help_pane=true/' "$cmd_script"
+      _battle_sed_inplace 's/has_help_pane=false/has_help_pane=true/' "$cmd_script"
       tmux new-session -d -s "$session" "zsh ${_battle_scripts[1]}"
       _ai_pane_ids[1]=$(tmux display-message -t "${session}" -p '#{pane_id}')
-      tmux split-window -v -t "${_ai_pane_ids[1]}" -p 30 "zsh ${cmd_script}"
-      _cmd_pane_id=$(tmux display-message -t "${session}" -p '#{pane_id}')
-      tmux split-window -h -t "${_ai_pane_ids[1]}" -p 67 "zsh ${_battle_scripts[2]}"
-      _ai_pane_ids[2]=$(tmux display-message -t "${session}" -p '#{pane_id}')
-      tmux split-window -h -t "${_ai_pane_ids[2]}" -p 50 "zsh ${_battle_scripts[3]}"
-      _ai_pane_ids[3]=$(tmux display-message -t "${session}" -p '#{pane_id}')
-      tmux split-window -h -t "${_cmd_pane_id}" -p 45 "zsh ${help_script}"
-      local _help_pane_id=$(tmux display-message -t "${session}" -p '#{pane_id}')
+      _cmd_pane_id=$(tmux split-window -v -t "${_ai_pane_ids[1]}" -l 30% -P -F '#{pane_id}' "zsh ${cmd_script}")
+      _ai_pane_ids[2]=$(tmux split-window -h -t "${_ai_pane_ids[1]}" -l 67% -P -F '#{pane_id}' "zsh ${_battle_scripts[2]}")
+      _ai_pane_ids[3]=$(tmux split-window -h -t "${_ai_pane_ids[2]}" -l 50% -P -F '#{pane_id}' "zsh ${_battle_scripts[3]}")
+      local _help_pane_id=$(tmux split-window -h -t "${_cmd_pane_id}" -l 45% -P -F '#{pane_id}' "zsh ${help_script}")
       tmux select-pane -t "${_cmd_pane_id}" -T "⌨️  COMMAND"
       tmux select-pane -t "${_help_pane_id}" -T "📋 GUIDE"
     else
       tmux new-session -d -s "$session" "zsh ${_battle_scripts[1]}"
       _ai_pane_ids[1]=$(tmux display-message -t "${session}" -p '#{pane_id}')
-      tmux split-window -h -t "${_ai_pane_ids[1]}" -p 50 "zsh ${_battle_scripts[2]}"
-      _ai_pane_ids[2]=$(tmux display-message -t "${session}" -p '#{pane_id}')
-      tmux split-window -v -t "${_ai_pane_ids[1]}" -p 50 "zsh ${_battle_scripts[3]}"
-      _ai_pane_ids[3]=$(tmux display-message -t "${session}" -p '#{pane_id}')
-      tmux split-window -v -t "${_ai_pane_ids[2]}" -p 50 "zsh ${cmd_script}"
-      _cmd_pane_id=$(tmux display-message -t "${session}" -p '#{pane_id}')
+      _ai_pane_ids[2]=$(tmux split-window -h -t "${_ai_pane_ids[1]}" -l 50% -P -F '#{pane_id}' "zsh ${_battle_scripts[2]}")
+      _ai_pane_ids[3]=$(tmux split-window -v -t "${_ai_pane_ids[1]}" -l 50% -P -F '#{pane_id}' "zsh ${_battle_scripts[3]}")
+      _cmd_pane_id=$(tmux split-window -v -t "${_ai_pane_ids[2]}" -l 50% -P -F '#{pane_id}' "zsh ${cmd_script}")
     fi
     echo "${_ai_pane_ids[1]} ${_ai_pane_ids[2]} ${_ai_pane_ids[3]}" > "$tmpdir/ai_panes.txt"
     tmux select-pane -t "${_ai_pane_ids[1]}" -T "${_yolo_icons[1]} ${(U)_yolo_opts[1]}"
@@ -55,6 +55,23 @@ _battle_setup_tmux() {
     if [[ "$_layout_choice" != "top3" ]]; then
       tmux select-pane -t "${_cmd_pane_id}" -T "⌨️  COMMAND CENTER"
     fi
+  elif [ $cnt -eq 4 ]; then
+    # 2x2 AI grid on left + stacked CMD/HELP on right (33% width)
+    _battle_sed_inplace 's/has_help_pane=false/has_help_pane=true/' "$cmd_script"
+    tmux new-session -d -s "$session" "zsh ${_battle_scripts[1]}"
+    _ai_pane_ids[1]=$(tmux display-message -t "${session}" -p '#{pane_id}')
+    _cmd_pane_id=$(tmux split-window -h -t "${_ai_pane_ids[1]}" -l 33% -P -F '#{pane_id}' "zsh ${cmd_script}")
+    local _help_pane_id=$(tmux split-window -v -t "${_cmd_pane_id}" -l 50% -P -F '#{pane_id}' "zsh ${help_script}")
+    _ai_pane_ids[2]=$(tmux split-window -h -t "${_ai_pane_ids[1]}" -l 50% -P -F '#{pane_id}' "zsh ${_battle_scripts[2]}")
+    _ai_pane_ids[3]=$(tmux split-window -v -t "${_ai_pane_ids[1]}" -l 50% -P -F '#{pane_id}' "zsh ${_battle_scripts[3]}")
+    _ai_pane_ids[4]=$(tmux split-window -v -t "${_ai_pane_ids[2]}" -l 50% -P -F '#{pane_id}' "zsh ${_battle_scripts[4]}")
+    echo "${_ai_pane_ids[1]} ${_ai_pane_ids[2]} ${_ai_pane_ids[3]} ${_ai_pane_ids[4]}" > "$tmpdir/ai_panes.txt"
+    tmux select-pane -t "${_ai_pane_ids[1]}" -T "${_yolo_icons[1]} ${(U)_yolo_opts[1]}"
+    tmux select-pane -t "${_ai_pane_ids[2]}" -T "${_yolo_icons[2]} ${(U)_yolo_opts[2]}"
+    tmux select-pane -t "${_ai_pane_ids[3]}" -T "${_yolo_icons[3]} ${(U)_yolo_opts[3]}"
+    tmux select-pane -t "${_ai_pane_ids[4]}" -T "${_yolo_icons[4]} ${(U)_yolo_opts[4]}"
+    tmux select-pane -t "${_cmd_pane_id}" -T "⌨️  COMMAND"
+    tmux select-pane -t "${_help_pane_id}" -T "📋 GUIDE"
   fi
 
   # collaborative mode: add role to pane titles

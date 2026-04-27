@@ -1,0 +1,5 @@
+# Synology NAS metadata (NFS 공유 환경)
+@eaDir/
+
+# macOS metadata
+.DS_Store

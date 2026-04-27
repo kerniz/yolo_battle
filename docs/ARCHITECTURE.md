@@ -2,7 +2,7 @@
 
 ## Overview
 
-`yolo_battle`은 여러 AI CLI(Claude, Gemini, Codex)를 tmux 기반으로 동시/순차/협동 실행하는 zsh 스크립트 프로젝트입니다.
+`yolo_battle`은 여러 AI CLI(Claude, Gemini, Codex, OpenCode)를 tmux 기반으로 동시/순차/협동 실행하는 zsh 스크립트 프로젝트입니다.
 
 ## File Structure
 

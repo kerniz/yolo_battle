@@ -32,7 +32,22 @@ STUB
 
   [ "$status" -eq 0 ]
   args=$(cat "$TEST_ROOT/args.txt")
-  [ "$args" = "--sandbox danger-full-access --ask-for-approval never foo bar" ]
+  [ "$args" = "--sandbox danger-full-access --ask-for-approval never -- foo bar" ]
+}
+
+@test "yolo opencode passes expected flags" {
+  cat > "$BIN_DIR/opencode" <<'STUB'
+#!/bin/sh
+printf "%s" "$*" > "$TEST_ARGS_FILE"
+STUB
+  chmod +x "$BIN_DIR/opencode"
+
+  TEST_ARGS_FILE="$TEST_ROOT/args.txt" \
+    run env PATH="$BIN_DIR" /bin/zsh -c 'source "'"$ROOT_DIR"'/yolo.zsh"; yolo opencode foo bar'
+
+  [ "$status" -eq 0 ]
+  args=$(cat "$TEST_ROOT/args.txt")
+  [ "$args" = "-- foo bar" ]
 }
 
 @test "yolo battle fails without tmux" {

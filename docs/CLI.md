@@ -18,6 +18,7 @@ Directly launch a single tool.
 yolo claude [args...]
 yolo gemini [args...]
 yolo codex [args...]
+yolo opencode [args...]
 ```
 
 ## `yolo battle`

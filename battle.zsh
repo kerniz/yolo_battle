@@ -166,9 +166,9 @@ _yolo_battle() {
   _battle_gen_help_panel
   _battle_gen_cmd_center
 
-  # ── layout selection for 3+ tools ──
+  # ── layout selection (only cnt==3 has two layouts; 4 has fixed 2x2) ──
   local _layout_choice="top3"
-  if [ $cnt -ge 3 ] && [ -t 0 ] && ! $_is_restart; then
+  if [ $cnt -eq 3 ] && [ -t 0 ] && ! $_is_restart; then
     _battle_select_layout
   fi
 

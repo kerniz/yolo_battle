@@ -1207,8 +1207,17 @@ _parallel_watcher_start() {
 # AUTO-NEXT: auto-start in sequential mode
 # ════════════════════════════════════════
 if [[ "$mode" == "sequential" ]]; then
-  _auto_start 10
-  printf "  ${cyn}${bld}🔄 /auto 자동 활성화 (순차모드, settle=10s)${rst}\n"
+  # opencode는 TUI 모드라 명령이 종료되지 않아 자동 전환이 부적합 → /auto 시작 생략
+  _has_opencode=false
+  for ((_i=1; _i<=${#_cmd_tools[@]}; _i++)); do
+    [[ "${_cmd_tools[$_i]}" == "opencode" ]] && _has_opencode=true
+  done
+  if $_has_opencode; then
+    printf "  ${ylw}${bld}⚠ /auto 자동 시작 생략${rst} ${dm}(opencode 포함 — TUI 모드, 작업 종료 후 ESC/quit 뒤 수동 /next 사용)${rst}\n"
+  else
+    _auto_start 10
+    printf "  ${cyn}${bld}🔄 /auto 자동 활성화 (순차모드, settle=10s)${rst}\n"
+  fi
 fi
 
 # ════════════════════════════════════════

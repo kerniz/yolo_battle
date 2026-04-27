@@ -1,6 +1,6 @@
 #!/bin/zsh
 # yolo - AI CLI launcher with YOLO mode (no guardrails)
-# Supports: claude, gemini, codex
+# Supports: claude, gemini, codex, opencode
 # https://github.com/kerniz/yolo_battle
 
 YOLO_DIR="${YOLO_DIR:-$HOME/.yolo}"
@@ -45,9 +45,12 @@ yolo() {
   if command -v codex >/dev/null 2>&1; then
     _yolo_opts+=("codex"); _yolo_icons+=("🧠"); tcolors+=("$green")
   fi
+  if command -v opencode >/dev/null 2>&1; then
+    _yolo_opts+=("opencode"); _yolo_icons+=("🦾"); tcolors+=("$purple")
+  fi
 
   if [ ${#_yolo_opts[@]} -eq 0 ]; then
-    printf "${red}${bold} ✖  No CLI found: claude / gemini / codex${reset}\n"
+    printf "${red}${bold} ✖  No CLI found: claude / gemini / codex / opencode${reset}\n"
     return 1
   fi
 
@@ -56,6 +59,12 @@ yolo() {
     shift
     source "${YOLO_DIR}/battle.zsh" && _yolo_battle "$@"
     return $?
+  fi
+
+  # If first arg is a flag (e.g. yolo --resume), trigger interactive picker
+  # and forward all args to the chosen tool
+  if [[ -n "$tool" && "$tool" == -* ]]; then
+    tool=""
   fi
 
   _yolo_loading() {
@@ -138,7 +147,7 @@ yolo() {
 
   if [ -z "$tool" ]; then
     if [ ! -t 0 ]; then
-      echo "Usage: yolo <claude|gemini|codex|battle> [args...]"
+      echo "Usage: yolo <claude|gemini|codex|opencode|battle> [args...]"
       return 1
     fi
 
@@ -237,9 +246,13 @@ yolo() {
       command -v codex >/dev/null 2>&1 || { echo "${red}codex not found${reset}"; return 1; }
       command codex --sandbox danger-full-access --ask-for-approval never -- "$@"
       ;;
+    opencode)
+      command -v opencode >/dev/null 2>&1 || { echo "${red}opencode not found${reset}"; return 1; }
+      OPENCODE_DANGEROUSLY_SKIP_PERMISSIONS=true command opencode -- "$@"
+      ;;
     *)
       printf "${red}${bold} ✖  Unknown tool: $tool${reset}\n"
-      echo "Usage: yolo <claude|gemini|codex|battle> [args...]"
+      echo "Usage: yolo <claude|gemini|codex|opencode|battle> [args...]"
       return 1
       ;;
   esac

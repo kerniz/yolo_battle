@@ -1,6 +1,6 @@
 # ⚔️ YOLO Battle
 
-Multi-agent AI battle system for your terminal. Run Claude, Gemini, and Codex simultaneously with no guardrails.
+Multi-agent AI battle system for your terminal. Run Claude, Gemini, Codex, and OpenCode simultaneously with no guardrails.
 
 ```
 ┌──────────────────┬──────────────────┐
@@ -9,21 +9,23 @@ Multi-agent AI battle system for your terminal. Run Claude, Gemini, and Codex si
 │  Working...      │  Working...      │
 │                  │                  │
 ├──────────────────┼──────────────────┤
-│  🧠 CODEX        │  ⌨️ COMMAND      │
-│                  │  CENTER          │
-│  Working...      │  ▸ _             │
+│  🧠 CODEX        │  🦾 OPENCODE     │
+│                  │                  │
+│  Working...      │  Working...      │
+│                  │                  │
 └──────────────────┴──────────────────┘
-⚔️ BATTLE ⠋ 12s  🤖 claude ⣾ │ ✨ gemini ⣾ │ 🧠 codex ⣾
+⚔️ BATTLE ⠋ 12s  🤖 claude ⣾ │ ✨ gemini ⣾ │ 🧠 codex ⣾ │ 🦾 opencode ⣾
 ```
 
 ## Requirements
 
-- **zsh** (default on macOS, auto-installed by `install.sh` on Ubuntu/Debian)
-- **tmux** (auto-installed by `install.sh`)
+- **zsh** (default on macOS)
+- **tmux** (`brew install tmux`)
 - At least **2** of the following AI CLIs:
   - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) — `npm install -g @anthropic-ai/claude-code`
   - [Gemini CLI](https://github.com/google-gemini/gemini-cli) — `npm install -g @google/gemini-cli`
   - [Codex CLI](https://github.com/openai/codex) — `npm install -g @openai/codex`
+  - [OpenCode](https://github.com/anomalyco/opencode) — `npm install -g opencode-ai` (or `brew install anomalyco/tap/opencode`)
 
 ## Install
 
@@ -38,27 +40,9 @@ Or manually:
 
 ```bash
 mkdir -p ~/.yolo
-cp yolo.zsh yolo.sh battle.zsh ~/.yolo/
-cp modes/*.zsh lib/*.zsh ~/.yolo/
-chmod +x ~/.yolo/yolo.sh ~/.yolo/battle.zsh
+cp yolo.zsh battle.zsh ~/.yolo/
 echo 'source "${HOME}/.yolo/yolo.zsh"' >> ~/.zshrc
 source ~/.zshrc
-```
-
-### Using yolo.sh (bash wrapper for zsh)
-
-`yolo.sh` is a thin bash/zsh shim that wraps `yolo.zsh`. It works on Linux bash environments too:
-
-```bash
-source ~/.bashrc
-yolo              # works in bash (calls zsh internally)
-yolo claude
-yolo battle "prompt"
-```
-
-Or add to your `~/.bashrc` manually:
-```bash
-# "${HOME}/.yolo/yolo.zsh" "$@"; }
 ```
 
 ## Usage
@@ -70,6 +54,7 @@ yolo              # interactive picker (↑↓ + Enter)
 yolo claude       # direct launch
 yolo gemini
 yolo codex
+yolo opencode
 ```
 
 ### Battle Mode
@@ -128,6 +113,7 @@ Role-based pipeline where each AI has a specific job:
 | 🤖 Claude | Lead Dev | Architecture & Core Logic |
 | ✨ Gemini | Reviewer | Quality, Security & Optimization |
 | 🧠 Codex | Test/Ops | Testing, CI/CD & Documentation |
+| 🦾 OpenCode | Core | Interactive implementation in TUI workflows |
 
 ## Command Center
 
@@ -171,7 +157,7 @@ The bottom status bar shows real-time status for each AI:
 
 ```bash
 rm -rf ~/.yolo
-# Remove the source line from ~/.zshrc or ~/.bashrc
+# Remove the source line from ~/.zshrc
 ```
 
 ## CLI Reference
